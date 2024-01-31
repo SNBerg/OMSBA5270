@@ -62,25 +62,21 @@ https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json
 """
 
 companyFacts = requests.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json", headers=headers)
-# print(companyFacts.json()['facts']['us-gaap']['Revenues']['units'])
+# print(companyFacts.json()['facts']['us-gaap']['SalesRevenueGoodsNet']['units'])
 
 # get revenues data
 """
-Revenues
-Amount of revenue recognized from goods sold, services rendered, insurance premiums, or other activities that constitute an earning process. 
-Includes, but is not limited to, investment and interest income before deduction of interest expense when recognized as a component of revenue, 
-and sales and trading gain (loss).
+SalesRevenueGoodsNet
+Aggregate revenue during the period from the sale of goods in the normal course of business, after deducting returns, allowances and discounts.
 """
 
-revenue_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['Revenues']['units']['USD'])
+revenue_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['SalesRevenueGoodsNet']['units']['USD'])
 revenue_df = revenue_df.sort_values(by=['start'])
 # check data structure
 print(revenue_df.info())
 # no null data
-# print(revenue_df) # 11 rows start date between 2015-09-27-2018-07-01
-# print(revenue_df.columns) #Index(['start', 'end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
-# print(revenue_df['form'].unique()) # has only ['10-K']
-
+# print(revenue_df) # 201 rows start date between 2007-02-04-2017-11-05
+# has data both in annual and quarterly, has multiple forms
 
 # statistics summary
 print(revenue_df.describe())
@@ -89,7 +85,7 @@ print(revenue_df.describe())
 # data has the same filed date
 
 # remove na
-revenue_df = revenue_df[revenue_df.frame.notna()]
+# revenue_df = revenue_df[revenue_df.frame.notna()]
 
 # get Assets and convert the facts on assets to a dataframe
 """
@@ -189,21 +185,42 @@ print(equity_df.describe())
 
 # get net income
 """
-NetIncomeLoss
+revenueLoss
 The portion of profit or loss for the period, net of income taxes, which is attributable to the parent.
 """
-netincome_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['NetIncomeLoss']['units']['USD'])
-print(netincome_df) # 302 rows end 2007-09-29-2023-09-30
-print(netincome_df.info())
-# print(netincome_df.columns) # Index(['start', 'end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
-# print(netincome_df['form'].unique()) # has multiple form ['10-K' '10-K/A' '10-Q' '8-K']
+revenue_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['revenueLoss']['units']['USD'])
+print(revenue_df) # 302 rows end 2007-09-29-2023-09-30
+print(revenue_df.info())
+# print(revenue_df.columns) # Index(['start', 'end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(revenue_df['form'].unique()) # has multiple form ['10-K' '10-K/A' '10-Q' '8-K']
 
 # statistics summary
-print(netincome_df.describe())
+print(revenue_df.describe())
 
 """
 Data cleaning and wrangling - cleanup duplicated row and prepare data for the next step
 """
+# filter for 10-K
+revenue_df_filtered = revenue_df[revenue_df['form'] == '10-K']
+# print(revenue_df_filtered)
+# print(revenue_df_filtered.count()) # 91 rows 2008-02-02 - 2018-02-03
+
+
+# sort data by end and filed dates
+revenue_df_filtered = revenue_df_filtered.sort_values(by=['end', 'filed'])
+
+# remove quarterly data # 45 rows
+# revenue_df_filtered = revenue_df_filtered[~revenue_df_filtered['frame'].str.contains('Q', na=False)]
+revenue_df_filtered['start'] = pd.to_datetime(revenue_df_filtered['start'])
+revenue_df_filtered['end'] = pd.to_datetime(revenue_df_filtered['end'])
+revenue_df_filtered['months_diff'] = ((revenue_df_filtered['end'] - revenue_df_filtered['start']) / pd.Timedelta(days=30)).astype(int)
+revenue_df_filtered = revenue_df_filtered[revenue_df_filtered['months_diff'] >= 12] # there are the same record that filed multiple times, need to drop duplicated
+revenue_df_filtered = revenue_df_filtered.drop(columns=['months_diff'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+revenue_df_filtered = revenue_df_filtered.drop_duplicates(subset=['end'], keep='last')
+# print(revenue_df_filtered) # 11 rows, 2008-02-02 - 2018-02-03
+
 # filter for 10-K form only
 assets_df_filtered = assets_df[assets_df['form'] == '10-K']
 # print(assets_df_filtered)
@@ -265,29 +282,6 @@ equity_df_filtered = equity_df_filtered.sort_values(by=['end', 'filed'])
 # remove duplicated rows of the same period and keep the row with the last filed.
 equity_df_filtered = equity_df_filtered.drop_duplicates(subset=['end'], keep='last')
 # print(equity_df_filtered) # 18 rows end 2006-09-30-2023-09-30
-
-# filter for 10-K
-netincome_df_filtered = netincome_df[netincome_df['form'] == '10-K']
-# print(netincome_df_filtered)
-# print(netincome_df_filtered.count()) # 133 rows 2007-09-29 - 2023-09-30
-# print(netincome_df_filtered['form'].unique()) # return ['10-K']
-
-# sort data by end and filed dates
-netincome_df_filtered = netincome_df_filtered.sort_values(by=['end', 'filed'])
-
-# remove quarterly data # 45 rows
-netincome_df_filtered = netincome_df_filtered[~netincome_df_filtered['frame'].str.contains('Q', na=False)]
-netincome_df_filtered['start'] = pd.to_datetime(netincome_df_filtered['start'])
-netincome_df_filtered['end'] = pd.to_datetime(netincome_df_filtered['end'])
-netincome_df_filtered['months_diff'] = ((netincome_df_filtered['end'] - netincome_df_filtered['start']) / pd.Timedelta(days=30)).astype(int)
-netincome_df_filtered = netincome_df_filtered[netincome_df_filtered['months_diff'] >= 12] # 17 rows end date 2007-09-29-2023-09-30
-netincome_df_filtered = netincome_df_filtered.drop(columns=['months_diff'])
-
-# remove duplicated rows of the same period and keep the row with the last filed.
-netincome_df_filtered = netincome_df_filtered.drop_duplicates(subset=['end'], keep='last')
-# print(netincome_df_filtered) # 17 rows end 2007-09-29-2023-09-30
-# there are quarterly data in this dataset, For example CY2008Q4.
-# frame column has NaN
 
 """ Summary and graph"""
 desc_assets = assets_df_filtered.describe()
@@ -352,18 +346,18 @@ equity_plot = px.line(equity_df_filtered,
                       y="val")
 equity_plot.show()
 
-desc_netincome = netincome_df_filtered.describe()
-print(desc_netincome['val'])
+desc_revenue = revenue_df_filtered.describe()
+print(desc_revenue['val'])
 # mean 46304294117.647
 # min  3496000000.000
 # max  99,803,000,000.000
 
 # what is the assets trend?
-netincome_plot = px.line(netincome_df_filtered,
+revenue_plot = px.line(revenue_df_filtered,
                       title=f"AAPL Net Income & Loss",
                       x="end",
                       y="val")
-netincome_plot.show()
+revenue_plot.show()
 
 # merge total assets and total liabilities using accn column for calculate current ratio
 # print(assets_df_filtered)
@@ -412,24 +406,24 @@ merged_plot2.show()
 
 # merge net income for calculate ROE
 # filed date can be different for the same period so join using end date instead of accn
-# print(netincome_df_filtered)
+# print(revenue_df_filtered)
 # update the end date type to datetime to join the data
 merged_asst_lib_eq_df['end'] = pd.to_datetime(merged_asst_lib_eq_df['end'])
 
 # merge data
-merged_asst_lib_eq_net_df = pd.merge(merged_asst_lib_eq_df, netincome_df_filtered, on='end')
+merged_asst_lib_eq_net_df = pd.merge(merged_asst_lib_eq_df, revenue_df_filtered, on='end')
 merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.drop(merged_asst_lib_eq_net_df.columns[12:], axis=1)
-merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.rename(columns={'val': 'netincome'})
+merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.rename(columns={'val': 'revenue'})
 merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.drop(columns='start')
 print(merged_asst_lib_eq_net_df) # 16 rows
 # print(merged_asst_lib_eq_net_df.columns)
 
 desc_merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.describe()
-print(desc_merged_asst_lib_eq_net_df[['netincome', 'equity']])
+print(desc_merged_asst_lib_eq_net_df[['revenue', 'equity']])
 
 # what is the liabilities trend?
 merged_plot3 = px.line(merged_asst_lib_eq_net_df,
-                      x='end', y=['netincome', 'equity'],
+                      x='end', y=['revenue', 'equity'],
                       title="AAPL Net Income & Shareholders' Equity")
 
 # Update layout to set x-axis and y-axis title
@@ -518,7 +512,7 @@ leverage_ratio_plot.show()
 # 4. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
 # this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
 
-merged_asst_lib_eq_net_df['roe_ratio'] = merged_asst_lib_eq_net_df['netincome'] / merged_asst_lib_eq_net_df['equity']
+merged_asst_lib_eq_net_df['roe_ratio'] = merged_asst_lib_eq_net_df['revenue'] / merged_asst_lib_eq_net_df['equity']
 # print(merged_asst_lib_eq_net_df)
 
 roe_ratio_plot = px.line(merged_asst_lib_eq_net_df,
