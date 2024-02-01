@@ -15,6 +15,7 @@ Project Objectives
 import requests
 import pandas as pd
 import plotly.express as px
+from tabulate import tabulate # to create ratio tables
 
 # setup display so it shows all columns
 pd.options.display.width= None
@@ -38,7 +39,6 @@ headers = {'User-Agent' : "sberg@seattleu.edu"}
 
 # get all companies data from the company_tickers.json
 # this will return a set of dictionary with cik_str (cik number), ticker (company symbol), title (company name)
-# for example {'0': {'cik_str': 320193, 'ticker': 'AAPL', 'title': 'Apple Inc.'}, '1': {'cik_str': 789019, 'ticker': 'MSFT', 'title': 'MICROSOFT CORP'},...
 companyTickers = requests.get(f"https://www.sec.gov/files/company_tickers.json", headers=headers)
 # print(companyTickers.json())
 
@@ -49,11 +49,21 @@ companyCIK = pd.DataFrame.from_dict(companyTickers.json(), orient='index')
 companyCIK['cik_str'] = companyCIK['cik_str'].astype(str).str.zfill(10)
 # print(companyCIK)
 
-# First company = Apple Inc. (AAPL)
+"""
+First company = Apple Inc. (AAPL)
+Apple Inc. (formerly Apple Computer, Inc.) is an American multinational technology company headquartered in Cupertino, California, in Silicon Valley. 
+It designs, develops, and sells consumer electronics, computer software, and online services. Devices include the iPhone, iPad, Mac, Apple Watch, and 
+Apple TV; operating systems include iOS and macOS; and software applications and services include iTunes, iCloud, and Apple Music.
+
+As of March 2023, Apple is the world's largest company by market capitalization.[6] In 2022, it was the largest technology company by revenue, 
+with US$394.3 billion.[7] As of June 2022, Apple was the fourth-largest personal computer vendor by unit sales, the largest manufacturing company 
+by revenue, and the second-largest manufacturer of mobile phones in the world. It is one of the Big Five American information technology companies, 
+alongside Alphabet (the parent company of Google), Amazon, Meta (the parent company of Facebook), and Microsoft.
+"""
 cik = search_comp('AAPL')  # call function search_comp to get cik_str
 # print(companyCIK[companyCIK['cik_str'] == cik])
 
-""" EDA """
+""" Data retrieval and EDA """
 """
 Source: data.sec.gov/api/xbrl/companyfacts/
 This API returns all the company concepts data for a company into a single API call:
@@ -62,30 +72,23 @@ https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json
 """
 
 companyFacts = requests.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json", headers=headers)
-# print(companyFacts.json()['facts']['us-gaap']['SalesRevenueGoodsNet']['units'])
+# print(companyFacts.json()['facts']['us-gaap']['SalesRevenueNet']['units'])
 
 # get revenues data
 """
-SalesRevenueGoodsNet
-Aggregate revenue during the period from the sale of goods in the normal course of business, after deducting returns, allowances and discounts.
+RevenueFromContractWithCustomerExcludingAssessedTax
+Amount, excluding tax collected from customer, of revenue from satisfaction of performance obligation by transferring promised good or service to customer.
+Tax collected from customer is tax assessed by governmental authority that is both imposed on and concurrent with specific revenue-producing transaction, 
+including, but not limited to, sales, use, value added and excise.
 """
 
-revenue_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['SalesRevenueGoodsNet']['units']['USD'])
+revenue_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['RevenueFromContractWithCustomerExcludingAssessedTax']['units']['USD'])
 revenue_df = revenue_df.sort_values(by=['start'])
 # check data structure
 print(revenue_df.info())
 # no null data
-# print(revenue_df) # 201 rows start date between 2007-02-04-2017-11-05
-# has data both in annual and quarterly, has multiple forms
-
-# statistics summary
-print(revenue_df.describe())
-
-# observation: frame appears to show calendar year period however this column has na
-# data has the same filed date
-
-# remove na
-# revenue_df = revenue_df[revenue_df.frame.notna()]
+# print(revenue_df) # 81 rows start date between 2017-09-30 - 2023-07-01
+# observation: has data both in annual and quarterly, has multiple forms, NaN in frame column
 
 # get Assets and convert the facts on assets to a dataframe
 """
@@ -97,21 +100,11 @@ assets_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['Asse
 print(assets_df) # 124 rows end 2008-09-27-2023-09-30
 print(assets_df.info())
 # observed multiple filing for the same perious of data, for example 2011-09-24 10-K has 2 filing on 2011-10-26 and 2012-10-31
-
-# statistics summary
-print(assets_df.describe())
 # print(assets_df.columns) # Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
 # print(assets_df['form'].unique()) # has multiple form ['10-K' '10-Q' '8-K']
 
 # observation: there are NaN in the dataset.
 # There could be more than one data filed at the same time. For example 2009-10-27 has two end years – 2008-09-27 and 2009-09-26.
-
-# check data to understand what accn column contain
-# assets_df = assets_df.sort_values(by=['accn', 'end'])
-# print(assets_df.iloc[0])
-
-# observation: fy and fp is based on filed date.
-# accn are the same for the data that filed on the same date.
 # there could be data that filed multiple times and the val could be the same or different.
 
 # get current assets
@@ -125,8 +118,6 @@ print(cur_assets_df) # 122 rows end 2008-09-27-2023-09-30
 print(cur_assets_df.info()) # non-null
 # print(cur_assets_df['form'].unique()) #['10-Q' '10-K' '10-K/A' '8-K']
 # print(cur_assets_df.columns) #Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
-# statistics summary
-print(cur_assets_df.describe())
 
 # observation: frame column contains NaN
 
@@ -143,9 +134,6 @@ print(liabilities_df) # 122 rows end 2008-09-27-2023-09-30
 print(liabilities_df.info())
 # print(liabilities_df.columns) #Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
 # print(liabilities_df['form'].unique()) # ['10-Q' '10-K/A' '10-K' '8-K']
-
-# statistics summary
-print(liabilities_df.describe())
 
 # get current liabilities
 """
@@ -180,22 +168,17 @@ print(equity_df.info())
 
 # observation, same as AssetsCurrent, there are multiple period, calendar year and quarterly. Different period of data can be filed at the same time.
 
-# statistics summary
-print(equity_df.describe())
-
+print(companyFacts.json()['facts']['us-gaap'].keys())
 # get net income
 """
-revenueLoss
+NetIncomeLossLoss
 The portion of profit or loss for the period, net of income taxes, which is attributable to the parent.
 """
-revenue_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['revenueLoss']['units']['USD'])
-print(revenue_df) # 302 rows end 2007-09-29-2023-09-30
-print(revenue_df.info())
-# print(revenue_df.columns) # Index(['start', 'end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
-# print(revenue_df['form'].unique()) # has multiple form ['10-K' '10-K/A' '10-Q' '8-K']
-
-# statistics summary
-print(revenue_df.describe())
+netincome_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['NetIncomeLoss']['units']['USD'])
+print(netincome_df) # 302 rows end 2007-09-29-2023-09-30
+print(netincome_df.info())
+# print(netincome_df.columns) # Index(['start', 'end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(netincome_df['form'].unique()) # has multiple form ['10-K' '10-K/A' '10-Q' '8-K']
 
 """
 Data cleaning and wrangling - cleanup duplicated row and prepare data for the next step
@@ -203,8 +186,7 @@ Data cleaning and wrangling - cleanup duplicated row and prepare data for the ne
 # filter for 10-K
 revenue_df_filtered = revenue_df[revenue_df['form'] == '10-K']
 # print(revenue_df_filtered)
-# print(revenue_df_filtered.count()) # 91 rows 2008-02-02 - 2018-02-03
-
+# print(revenue_df_filtered.count()) # 91 rows 2007-09-29 - 2017-09-30
 
 # sort data by end and filed dates
 revenue_df_filtered = revenue_df_filtered.sort_values(by=['end', 'filed'])
@@ -219,7 +201,11 @@ revenue_df_filtered = revenue_df_filtered.drop(columns=['months_diff'])
 
 # remove duplicated rows of the same period and keep the row with the last filed.
 revenue_df_filtered = revenue_df_filtered.drop_duplicates(subset=['end'], keep='last')
-# print(revenue_df_filtered) # 11 rows, 2008-02-02 - 2018-02-03
+# print(revenue_df_filtered) # 11 rows, 2007-09-29 - 2017-09-30
+
+# drop start as we no longer need this
+revenue_df_filtered = revenue_df_filtered.drop(columns='start')
+# print(revenue_df_filtered)
 
 # filter for 10-K form only
 assets_df_filtered = assets_df[assets_df['form'] == '10-K']
@@ -283,7 +269,46 @@ equity_df_filtered = equity_df_filtered.sort_values(by=['end', 'filed'])
 equity_df_filtered = equity_df_filtered.drop_duplicates(subset=['end'], keep='last')
 # print(equity_df_filtered) # 18 rows end 2006-09-30-2023-09-30
 
+# filter for 10-K
+netincome_df_filtered = netincome_df[netincome_df['form'] == '10-K']
+# print(netincome_df_filtered)
+# print(netincome_df_filtered.count()) # 133 rows 2007-09-29 - 2023-09-30
+# print(netincome_df_filtered['form'].unique()) # return ['10-K']
+
+# sort data by end and filed dates
+netincome_df_filtered = netincome_df_filtered.sort_values(by=['end', 'filed'])
+
+# remove quarterly data # 45 rows
+netincome_df_filtered = netincome_df_filtered[~netincome_df_filtered['frame'].str.contains('Q', na=False)]
+netincome_df_filtered['start'] = pd.to_datetime(netincome_df_filtered['start'])
+netincome_df_filtered['end'] = pd.to_datetime(netincome_df_filtered['end'])
+netincome_df_filtered['months_diff'] = ((netincome_df_filtered['end'] - netincome_df_filtered['start']) / pd.Timedelta(days=30)).astype(int)
+netincome_df_filtered = netincome_df_filtered[netincome_df_filtered['months_diff'] >= 12] # 17 rows end date 2007-09-29-2023-09-30
+netincome_df_filtered = netincome_df_filtered.drop(columns=['months_diff'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+netincome_df_filtered = netincome_df_filtered.drop_duplicates(subset=['end'], keep='last')
+
+# drop start date, we only need end date
+netincome_df_filtered = netincome_df_filtered.drop(columns='start')
+# print(netincome_df_filtered) # 17 rows end 2007-09-29-2023-09-30
+# there are quarterly data in this dataset, For example CY2008Q4.
+# frame column has NaN
+
 """ Summary and graph"""
+desc_rev = revenue_df_filtered.describe()
+print(desc_rev['val'])
+# mean 92,615,221,311.475
+# min  30,006,000,000.000
+# max  163,231,000,000.000
+
+# create visual
+rev_plot = px.line(revenue_df_filtered,
+                  title='AAPL Revenues',
+                  x='end',
+                  y='val')
+rev_plot.show()
+
 desc_assets = assets_df_filtered.describe()
 print(desc_assets['val'])
 # mean 247,621,750,000.00
@@ -346,22 +371,20 @@ equity_plot = px.line(equity_df_filtered,
                       y="val")
 equity_plot.show()
 
-desc_revenue = revenue_df_filtered.describe()
-print(desc_revenue['val'])
+desc_netincome = netincome_df_filtered.describe()
+print(desc_netincome['val'])
 # mean 46304294117.647
 # min  3496000000.000
 # max  99,803,000,000.000
 
-# what is the assets trend?
-revenue_plot = px.line(revenue_df_filtered,
-                      title=f"AAPL Net Income & Loss",
+# what is the netincome trend?
+netincome_plot = px.line(netincome_df_filtered,
+                      title=f"APPL Net Income & Loss",
                       x="end",
                       y="val")
-revenue_plot.show()
+netincome_plot.show()
 
-# merge total assets and total liabilities using accn column for calculate current ratio
-# print(assets_df_filtered)
-# print(liabilities_df_filtered)
+# merge total assets and total liabilities using end column for calculate current ratio
 merged_asst_lib_df = pd.merge(assets_df_filtered, liabilities_df_filtered, on=['end'], how='inner')
 merged_asst_lib_df = merged_asst_lib_df.drop(merged_asst_lib_df.columns[9:], axis=1)
 # print(merged_asst_lib_df) # 16 rows
@@ -406,25 +429,23 @@ merged_plot2.show()
 
 # merge net income for calculate ROE
 # filed date can be different for the same period so join using end date instead of accn
-# print(revenue_df_filtered)
 # update the end date type to datetime to join the data
 merged_asst_lib_eq_df['end'] = pd.to_datetime(merged_asst_lib_eq_df['end'])
 
 # merge data
-merged_asst_lib_eq_net_df = pd.merge(merged_asst_lib_eq_df, revenue_df_filtered, on='end')
-merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.drop(merged_asst_lib_eq_net_df.columns[12:], axis=1)
-merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.rename(columns={'val': 'revenue'})
-merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.drop(columns='start')
+merged_asst_lib_eq_net_df = pd.merge(merged_asst_lib_eq_df, netincome_df_filtered, on='end')
+merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.drop(merged_asst_lib_eq_net_df.columns[11:], axis=1)
+merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.rename(columns={'val': 'netincome'})
 print(merged_asst_lib_eq_net_df) # 16 rows
 # print(merged_asst_lib_eq_net_df.columns)
 
 desc_merged_asst_lib_eq_net_df = merged_asst_lib_eq_net_df.describe()
-print(desc_merged_asst_lib_eq_net_df[['revenue', 'equity']])
+print(desc_merged_asst_lib_eq_net_df[['netincome', 'equity']])
 
 # what is the liabilities trend?
 merged_plot3 = px.line(merged_asst_lib_eq_net_df,
-                      x='end', y=['revenue', 'equity'],
-                      title="AAPL Net Income & Shareholders' Equity")
+                      x='end', y=['netincome', 'equity'],
+                      title="APPL Net Income & Shareholders' Equity")
 
 # Update layout to set x-axis and y-axis title
 merged_plot3.update_layout(yaxis_title="Value in $")
@@ -433,9 +454,31 @@ merged_plot3.update_layout(xaxis_title="Date")
 # Show the plot
 merged_plot3.show()
 
+# merge sales revenue data
+# print(merged_asst_lib_eq_net_df['end'], revenue_df_filtered['end'])
+# end date aligned between files so join with end date
+merged_asst_lib_eq_net_rev_df = pd.merge(merged_asst_lib_eq_net_df, revenue_df_filtered, on='end')
+merged_asst_lib_eq_net_rev_df = merged_asst_lib_eq_net_rev_df.drop(merged_asst_lib_eq_net_rev_df.columns[12:], axis=1)
+merged_asst_lib_eq_net_rev_df = merged_asst_lib_eq_net_rev_df.rename(columns={'val': 'revenue'})
+print(merged_asst_lib_eq_net_rev_df) # 7 rows
+# print(merged_asst_lib_eq_net_rev_df.columns)
+
+desc_merged_asst_lib_eq_net_rev_df = merged_asst_lib_eq_net_rev_df.describe()
+print(desc_merged_asst_lib_eq_net_rev_df[['netincome', 'revenue']])
+
+# what is the liabilities trend?
+merged_plot4 = px.line(merged_asst_lib_eq_net_rev_df,
+                      x='end', y=['netincome', 'revenue'],
+                      title="APPL Net Income & Total Revenue")
+
+# Update layout to set x-axis and y-axis title
+merged_plot4.update_layout(yaxis_title="Value in $")
+merged_plot4.update_layout(xaxis_title="Date")
+
+# Show the plot
+merged_plot4.show()
+
 # merge current assets and current liabilities
-print(cur_assets_df_filtered)
-print(cur_liabilities_df_filtered)
 merged_cur_asst_lib_df = pd.merge(cur_assets_df_filtered, cur_liabilities_df_filtered, on=['accn', 'end'], how='inner')
 merged_cur_asst_lib_df = merged_cur_asst_lib_df.drop(merged_cur_asst_lib_df.columns[9:], axis=1)
 merged_cur_asst_lib_df = merged_cur_asst_lib_df.rename(columns={'val_x': 'current_assets', 'val_y': 'current_liabilities'})
@@ -447,16 +490,16 @@ desc_merged_cur_asst_lib_df = merged_cur_asst_lib_df.describe()
 print(desc_merged_cur_asst_lib_df[['current_assets', 'current_liabilities']])
 
 # what is the liabilities trend?
-merged_plot4 = px.line(merged_cur_asst_lib_df,
+merged_plot5 = px.line(merged_cur_asst_lib_df,
                       x='end', y=['current_assets', 'current_liabilities'],
                       title="AAPL Current Assets & Current Liabilities")
 
 # Update layout to set x-axis and y-axis title
-merged_plot4.update_layout(yaxis_title="Value in $")
-merged_plot4.update_layout(xaxis_title="Date")
+merged_plot5.update_layout(yaxis_title="Value in $")
+merged_plot5.update_layout(xaxis_title="Date")
 
 # Show the plot
-merged_plot4.show()
+merged_plot5.show()
 
 """ Ratios """
 # 1. Current ratio = Current Assets / Current Liabilities
@@ -492,27 +535,10 @@ debt_to_equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_df['debt
 
 debt_to_equity_ratio_plot.show()
 
-# 3. Leverage = Total Assets / Total Equity
-# Equity multiplier. This tell us the leverage impact of the debt and the increasing business risk
-
-merged_asst_lib_eq_df['leverage_ratio'] = merged_asst_lib_eq_df['assets'] / merged_asst_lib_eq_df['equity']
-# print(merged_asst_lib_eq_df)
-
-leverage_ratio_plot = px.line(merged_asst_lib_eq_df,
-                      x='end', y='leverage_ratio',
-                      title="AAPL Leverage Ratio",
-                                    labels={
-                                        'leverage_ratio': "Leverage Ratio",
-                                        "end": "Date"
-                                    })
-leverage_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_df['leverage_ratio'])])
-
-leverage_ratio_plot.show()
-
-# 4. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
+# 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
 # this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
 
-merged_asst_lib_eq_net_df['roe_ratio'] = merged_asst_lib_eq_net_df['revenue'] / merged_asst_lib_eq_net_df['equity']
+merged_asst_lib_eq_net_df['roe_ratio'] = merged_asst_lib_eq_net_df['netincome'] / merged_asst_lib_eq_net_df['equity']
 # print(merged_asst_lib_eq_net_df)
 
 roe_ratio_plot = px.line(merged_asst_lib_eq_net_df,
@@ -525,5 +551,604 @@ roe_ratio_plot = px.line(merged_asst_lib_eq_net_df,
 roe_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df['roe_ratio'])])
 
 roe_ratio_plot.show()
+
+# 4. Net Profit Margin = Net Income/Total Revenue
+merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio'] = merged_asst_lib_eq_net_rev_df['netincome'] / merged_asst_lib_eq_net_rev_df['revenue']
+# print(merged_asst_lib_eq_net_rev_df)
+
+netprofmargin_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df,
+                      x='end', y='netprofitmargin_ratio',
+                      title="AAPL Net Profit Margin Ratio",
+                                    labels={
+                                        'netprofitmargin_ratio': "Net Profit Margin Ratio",
+                                        "end": "Date"
+                                    })
+netprofmargin_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio'])])
+
+netprofmargin_ratio_plot.show()
+
+print(merged_asst_lib_eq_net_rev_df[['end','revenue', 'assets']])
+# 5. Asset Turnover Ratio = Total Revenue / (Beginning Assets + Ending Assets)/2)
+# merged_asst_lib_eq_net_rev_df.loc['assetturnover_ratio'] = merged_asst_lib_eq_net_rev_df.loc['revenue'] / merged_asst_lib_eq_net_rev_df.loc['assets'].rolling(2).mean()
+# Calculate average total assets
+# merged_asst_lib_eq_net_rev_df['avg_assets'] = (merged_asst_lib_eq_net_rev_df['assets'].shift(1) + merged_asst_lib_eq_net_rev_df['assets']) / 2
+# merged_asst_lib_eq_net_rev_df['asset_turnover_ratio'] = merged_asst_lib_eq_net_rev_df['revenue'] / merged_asst_lib_eq_net_rev_df['avg_assets']
+
+# Calculate rolling average of total assets
+window_size = 2
+merged_asst_lib_eq_net_rev_df['rolling_avg_assets'] = merged_asst_lib_eq_net_rev_df['assets'].rolling(window=window_size).mean()
+
+# Calculate asset turnover
+merged_asst_lib_eq_net_rev_df['asset_turnover_ratio'] = merged_asst_lib_eq_net_rev_df['revenue'] / merged_asst_lib_eq_net_rev_df['rolling_avg_assets']
+print(merged_asst_lib_eq_net_rev_df)
+
+asset_turnover_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df,
+                      x='end', y='asset_turnover_ratio',
+                      title="AAPL asset_turnover Ratio",
+                                    labels={
+                                        'asset_turnover_ratio': "Asset Turnover Ratio",
+                                        "end": "Date"
+                                    })
+asset_turnover_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df['asset_turnover_ratio'])])
+
+asset_turnover_ratio_plot.show()
+
+"""
+Second company = Kroger Co. (KR)
+The Kroger Company, or simply Kroger, is an American retail company that operates (either directly or through its subsidiaries[5]) supermarkets and 
+multi-department stores throughout the United States
+"""
+
+cik = search_comp('KR')  # call function search_comp to get cik_str
+# print(companyCIK[companyCIK['cik_str'] == cik])
+
+""" Data retrieval and EDA """
+"""
+Source: data.sec.gov/api/xbrl/companyfacts/
+This API returns all the company concepts data for a company into a single API call:
+
+https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json
+"""
+
+companyFacts2 = requests.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json", headers=headers)
+# print(companyFacts.json()['facts']['us-gaap']['SalesRevenueNet']['units'])
+
+# get revenues data
+"""
+RevenueFromContractWithCustomerExcludingAssessedTax
+Amount, excluding tax collected from customer, of revenue from satisfaction of performance obligation by transferring promised good or service to customer.
+Tax collected from customer is tax assessed by governmental authority that is both imposed on and concurrent with specific revenue-producing transaction, 
+including, but not limited to, sales, use, value added and excise.
+"""
+
+revenue_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['RevenueFromContractWithCustomerExcludingAssessedTax']['units']['USD'])
+revenue_df2 = revenue_df.sort_values(by=['start'])
+# check data structure
+print(revenue_df2.info())
+# no null data
+# print(revenue_df2) # 81 rows start date between 2017-09-30 - 2023-07-01
+# observation: has data both in annual and quarterly, has multiple forms, NaN in frame column
+
+# get Assets and convert the facts on assets to a dataframe
+"""
+Assets 
+Sum of the carrying amounts as of the balance sheet date of all assets that are recognized. 
+Assets are probable future economic benefits obtained or controlled by an entity as a result of past transactions or events.
+"""
+assets_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['Assets']['units']['USD'])
+print(assets_df2) # 120 rows end 2009-01-31-2023-11-04
+print(assets_df2.info())
+# observed multiple filing for the same perious of data, for example 2011-09-24 10-K has 2 filing on 2011-10-26 and 2012-10-31
+# print(assets_df.columns) # Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(assets_df2['form'].unique()) # has multiple form ['10-Q' '10-K' '10-K/A']
+
+# observation: there are NaN in the dataset.
+# Data can be filed multiple times with the same or different frame. Frame shows either NaN or quartrely period.
+
+# get current assets
+"""
+AssetsCurrent
+Sum of the carrying amounts as of the balance sheet date of all assets that are expected to be realized in cash, sold, or consumed within one year (or the normal operating cycle, if longer). 
+Assets are probable future economic benefits obtained or controlled by an entity as a result of past transactions or events.
+"""
+cur_assets_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['AssetsCurrent']['units']['USD'])
+print(cur_assets_df2) # 120 rows end 2009-01-31-2023-11-04
+print(cur_assets_df2.info()) # non-null
+# print(cur_assets_df2['form'].unique()) #['10-Q' '10-K' '10-K/A' '8-K']
+# print(cur_assets_df2.columns) #Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+
+# observation: frame column contains NaN
+
+# get liabilities data and convert the facts on assets to a dataframe
+"""
+Liabilities
+Sum of the carrying amounts as of the balance sheet date of all liabilities that are recognized. 
+Liabilities are probable future sacrifices of economic benefits arising from present obligations of an entity to transfer assets 
+or provide services to other entities in the future.
+"""
+liabilities_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['Liabilities']['units']['USD'])
+print(liabilities_df2) # 120 rows end 2009-01-31-2023-11-04
+print(liabilities_df2.info())
+# print(liabilities_df2.columns) #Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(liabilities_df2['form'].unique()) # ['10-Q' '10-K' '10-K/A']
+
+# get current liabilities
+"""
+LiabilitiesCurrent
+Total obligations incurred as part of normal operations that are expected to be paid during the following twelve months or within one business cycle, if longer.
+"""
+cur_liabilities_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['LiabilitiesCurrent']['units']['USD'])
+print(cur_liabilities_df2) # 120 rows end 2009-01-31-2023-11-04
+print(cur_liabilities_df2.info())
+# print(cur_liabilities_df2.columns) # Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(cur_liabilities_df2['form'].unique()) # has multiple form ['10-Q' '10-K' '10-K/A']
+
+# observation, there are NaN or quarterly period in frame. Different period of data can be filed at the same time for different forms.
+
+# get stockholders' equity
+"""
+StockholdersEquity
+Total of all stockholders' equity (deficit) items, net of receivables from officers, directors, owners, and affiliates of the entity which are attributable to the parent.
+The amount of the economic entity's stockholders' equity attributable to the parent excludes the amount of stockholders' equity 
+which is allocable to that ownership interest in subsidiary equity which is not attributable to the parent (noncontrolling interest, minority interest). 
+This excludes temporary equity and is sometimes called permanent equity.
+"""
+equity_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['StockholdersEquity']['units']['USD'])
+print(equity_df2) # 120 rows end 2009-01-31-2023-11-04
+print(equity_df2.info())
+# print(equity_df2.columns) # Index(['end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(equity_df2['form'].unique()) # has multiple form ['10-Q' '10-K' '10-K/A']
+
+# observation, frame can be NaN or shows quarterly. Different period of data can be filed at the same time.
+
+# get net income
+"""
+NetIncomeLossLoss
+The portion of profit or loss for the period, net of income taxes, which is attributable to the parent.
+"""
+netincome_df2 = pd.DataFrame.from_dict(companyFacts2.json()['facts']['us-gaap']['NetIncomeLoss']['units']['USD'])
+print(netincome_df2) # 283 rows end 2009-01-31-2023-11-04
+print(netincome_df2.info())
+# print(netincome_df2.columns) # Index(['start', 'end', 'val', 'accn', 'fy', 'fp', 'form', 'filed', 'frame'], dtype='object')
+# print(netincome_df2['form'].unique()) # has multiple form ['10-K' '10-Q' '10-K/A']
+
+# observation: val could be a negative value
+
+"""
+Data cleaning and wrangling - cleanup duplicated row and prepare data for the next step
+"""
+# filter for 10-K
+revenue_df_filtered2 = revenue_df2[revenue_df2['form'] == '10-K']
+# print(revenue_df_filtered2)
+# print(revenue_df_filtered2.count()) # 31 rows 2017-09-30 - 2023-09-30
+
+# sort data by end and filed dates
+revenue_df_filtered2 = revenue_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove quarterly data # 45 rows
+# revenue_df_filtered2 = revenue_df_filtered2[~revenue_df_filtered2['frame'].str.contains('Q', na=False)]
+revenue_df_filtered2['start'] = pd.to_datetime(revenue_df_filtered2['start'])
+revenue_df_filtered2['end'] = pd.to_datetime(revenue_df_filtered2['end'])
+revenue_df_filtered2['months_diff'] = ((revenue_df_filtered2['end'] - revenue_df_filtered2['start']) / pd.Timedelta(days=30)).astype(int)
+revenue_df_filtered2 = revenue_df_filtered2[revenue_df_filtered2['months_diff'] >= 12] # there are the same record that filed multiple times, need to drop duplicated
+revenue_df_filtered2 = revenue_df_filtered2.drop(columns=['months_diff'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+revenue_df_filtered2 = revenue_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+# print(revenue_df_filtered2) # 7 rows, 2017-09-30 - 2023-09-30
+
+# drop start as we no longer need this
+revenue_df_filtered2 = revenue_df_filtered2.drop(columns='start')
+# print(revenue_df_filtered2)
+
+# filter for 10-K form only
+assets_df_filtered2 = assets_df2[assets_df2['form'] == '10-K']
+# print(assets_df_filtered2)
+# print(assets_df_filtered2.count()) # 28 rows
+# has duplicated row need to be dedup
+
+# sort data by end and filed dates
+assets_df_filtered2 = assets_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+assets_df_filtered2 = assets_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+# print(assets_df_filtered2) # 15 rows end 2009-01-31-2023-01-28
+
+# filter for 10-K form
+cur_assets_df_filtered2 = cur_assets_df2[cur_assets_df2['form'] == '10-K']
+# print(assets_df_filtered2) # end date 2009-01-31 - 2023-01-28
+# print(assets_df_filtered2.count()) # 15 rows
+# print(assets_df_filtered2['form'].unique()) # return ['10-K']
+
+# sort data by end and filed dates
+cur_assets_df_filtered2 = cur_assets_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+cur_assets_df_filtered2 = cur_assets_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+# print(cur_assets_df_filtered2) # 15 rows end 2009-01-31 - 2023-01-28
+
+liabilities_df_filtered2 = liabilities_df2[liabilities_df2['form'] == '10-K']
+# print(liabilities_df_filtered2) # end 2009-01-31 - 2023-01-28
+# print(liabilities_df_filtered2.count()) # 28 rows
+
+# sort data by end and filed dates
+liabilities_df_filtered2 = liabilities_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+liabilities_df_filtered2 = liabilities_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+# print(liabilities_df_filtered2) # 28 rows , end 2009-01-31 - 2023-01-28
+
+# filter for the 10-K form
+cur_liabilities_df_filtered2 = cur_liabilities_df2[cur_liabilities_df2['form'] == '10-K']
+# print(cur_liabilities_df_filtered2) #end 2009-01-31 - 2023-01-28
+# print(cur_liabilities_df_filtered2.count()) # 28 rows
+
+# sort data by end and filed dates
+cur_liabilities_df_filtered2 = cur_liabilities_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+cur_liabilities_df_filtered2 = cur_liabilities_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+# print(cur_liabilities_df_filtered2) # 15 rows  #end 2009-01-31 - 2023-01-28
+
+equity_df_filtered2 = equity_df2[equity_df2['form'] == '10-K']
+# print(equity_df_filtered2) #end 2009-01-31 - 2023-01-28
+# print(equity_df_filtered2.count()) # 28 rows
+# contains duplicated end date
+
+# sort data by end and filed dates
+equity_df_filtered2 = equity_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+equity_df_filtered2 = equity_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+# print(equity_df_filtered2) # 15 rows end 2009-01-31 - 2023-01-28
+
+# filter for 10-K
+netincome_df_filtered2 = netincome_df2[netincome_df2['form'] == '10-K']
+# print(netincome_df_filtered)
+# print(netincome_df_filtered.count()) # 133 rows 2007-09-29 - 2023-09-30
+# print(netincome_df_filtered['form'].unique()) # return ['10-K']
+
+# sort data by end and filed dates
+netincome_df_filtered2 = netincome_df_filtered2.sort_values(by=['end', 'filed'])
+
+# remove quarterly data # 45 rows
+netincome_df_filtered2['start'] = pd.to_datetime(netincome_df_filtered2['start'])
+netincome_df_filtered2['end'] = pd.to_datetime(netincome_df_filtered2['end'])
+netincome_df_filtered2['months_diff'] = ((netincome_df_filtered2['end'] - netincome_df_filtered2['start']) / pd.Timedelta(days=30)).astype(int)
+netincome_df_filtered2 = netincome_df_filtered2[netincome_df_filtered2['months_diff'] >= 12] # 17 rows end date 2007-09-29-2023-09-30
+netincome_df_filtered2 = netincome_df_filtered2.drop(columns=['months_diff'])
+
+# remove duplicated rows of the same period and keep the row with the last filed.
+netincome_df_filtered2 = netincome_df_filtered2.drop_duplicates(subset=['end'], keep='last')
+
+# drop start date, we only need end date
+netincome_df_filtered2 = netincome_df_filtered2.drop(columns='start')
+# print(netincome_df_filtered2) # 16 rows end 2008-02-02-2023-01-28
+
+""" Summary and graph"""
+desc_rev2 = revenue_df_filtered2.describe()
+print(desc_rev2['val'])
+# mean 310,421,142,857.143
+# min  229,234,000,000.000
+# max  394,328,000,000.000
+
+# create visual
+rev_plot2 = px.line(revenue_df_filtered2,
+                  title='KR Revenues',
+                  x='end',
+                  y='val')
+rev_plot2.show()
+
+desc_assets2 = assets_df_filtered2.describe()
+print(desc_assets2['val'])
+# mean 34,408,000,000.000
+# min  23,126,000,000.000
+# max  49,623,000,000.000
+
+# what is the assets trend?
+assets_plot2 = px.line(assets_df_filtered2,
+                      title=f"KR Assets",
+                      x="end",
+                      y="val")
+assets_plot2.show()
+
+desc_cur_assets2 = cur_assets_df2.describe()
+print(desc_cur_assets2)
+# mean 9,771,908,333.333
+# min  6,706,000,000.000
+# max  13,439,000,000.000
+
+cur_assets_plot2 = px.line(cur_assets_df_filtered2,
+                      title=f"KR Current Assets",
+                      x="end",
+                      y="val")
+cur_assets_plot2.show() # upward trends with some dips in 2011, 2018, and 2021
+
+desc_liabilities2 = liabilities_df_filtered2.describe()
+print(desc_liabilities2['val'])
+# mean 12,344,583,333.333
+# min  7,629,000,000.000
+# max  17,738,000,000.000
+
+# what is the liabilities trend look like?
+liabilities_plot2 = px.line(liabilities_df_filtered2,
+                      title=f"KR Liabilities",
+                      x="end",
+                      y="val")
+liabilities_plot2.show() # gradually upward trend between 2009-2017, plateau between 2017-2019 then a sharp spike in 2019-2020.
+
+desc_cur_liabilities2 = cur_liabilities_df2.describe()
+print(desc_cur_liabilities2)
+# mean 6,760,208,333.333
+# min  3,761,000,000.000
+# max  11,209,000,000.000
+
+cur_liabilities_plot2 = px.line(cur_liabilities_df_filtered2,
+                      title=f"AAPL Current Liabilities",
+                      x="end",
+                      y="val")
+cur_liabilities_plot2.show() # upward trends, steady upward since 2020
+
+desc_equity2 = equity_df2.describe()
+print(desc_equity2)
+# mean 6,760,208,333.333
+# min  3,761,000,000.000
+# max  11,209,000,000.000
+
+equity_plot2 = px.line(equity_df_filtered2,
+                      title=f"KR Stockholder Equity",
+                      x="end",
+                      y="val")
+equity_plot2.show() # a dip between 2011-2012 then upward trend
+
+desc_netincome2 = netincome_df_filtered2.describe()
+print(desc_netincome2['val'])
+# mean 1,635,250,000.000
+# min  70,000,000.000
+# max  3,110,000,000.000
+
+# what is the netincome trend?
+netincome_plot2 = px.line(netincome_df_filtered2,
+                      title=f"KR Net Income & Loss",
+                      x="end",
+                      y="val")
+netincome_plot2.show() # fluctuation
+
+# merge total assets and total liabilities using end column for calculate current ratio
+merged_asst_lib_df2 = pd.merge(assets_df_filtered2, liabilities_df_filtered2, on=['end'], how='inner')
+merged_asst_lib_df2 = merged_asst_lib_df2.drop(merged_asst_lib_df2.columns[9:], axis=1)
+# print(merged_asst_lib_df2) # 15 rows 2009-01-31 - 2023-01-28
+
+
+merged_asst_lib_df2 = merged_asst_lib_df2.rename(columns={'val_x': 'assets', 'val_y': 'liabilities'})
+print(merged_asst_lib_df2) # 15 rows 2009-01-31 - 2023-01-28
+
+# get summaries of merged dataframe
+desc_merged_asst_lib_df2 = merged_asst_lib_df2.describe()
+print(desc_merged_asst_lib_df2[['assets', 'liabilities']])
+
+# what is the liabilities trend?
+merged_plot12 = px.bar(merged_asst_lib_df2,
+                      x='end', y=['assets', 'liabilities'],
+                      title="KR Assets & Liabilities", barmode='group')
+merged_plot12.update_layout(yaxis_title="Value in $")
+merged_plot12.update_layout(xaxis_title="Date")
+
+merged_plot12.show() # assets and liabilities go parallel to each other
+
+# merge total assets and total liability with shareholders' equity to calculate D/E ratio
+# filed date for the same period appears to be different from each other so using end date to join the two data
+merged_asst_lib_eq_df2 = pd.merge(merged_asst_lib_df2, equity_df_filtered2, on='end')
+merged_asst_lib_eq_df2 = merged_asst_lib_eq_df2.drop(merged_asst_lib_eq_df2.columns[10:], axis=1)
+merged_asst_lib_eq_df2 = merged_asst_lib_eq_df2.rename(columns={'val': 'equity'})
+print(merged_asst_lib_eq_df2) # 15 rows 2009-01-31 - 2023-01-28
+
+desc_merged_asst_lib_eq_df2 = merged_asst_lib_eq_df2.describe()
+print(desc_merged_asst_lib_eq_df2[['liabilities', 'equity']])
+
+# plot graph, check the trends
+merged_plot22 = px.line(merged_asst_lib_eq_df2,
+                      x='end', y=['liabilities', 'equity'],
+                      title="KR Total Liabilities & Shareholders' Equity")
+merged_plot22.update_layout(yaxis_title="Value in $")
+merged_plot22.update_layout(xaxis_title="Date")
+merged_plot22.show() # equity appears to be pateau, liabilities has gradually increased with a spike in 2019
+
+# merge net income for calculate ROE
+# filed date can be different for the same period so join using end date instead of accn
+# update the end date type to datetime to join the data
+merged_asst_lib_eq_df2['end'] = pd.to_datetime(merged_asst_lib_eq_df2['end'])
+
+# merge data
+merged_asst_lib_eq_net_df2 = pd.merge(merged_asst_lib_eq_df2, netincome_df_filtered2, on='end')
+merged_asst_lib_eq_net_df2 = merged_asst_lib_eq_net_df2.drop(merged_asst_lib_eq_net_df2.columns[11:], axis=1)
+merged_asst_lib_eq_net_df2 = merged_asst_lib_eq_net_df2.rename(columns={'val': 'netincome'})
+print(merged_asst_lib_eq_net_df2) # 15 rows 2009-01-31 - 2023-01-28
+# print(merged_asst_lib_eq_net_df2.columns)
+
+desc_merged_asst_lib_eq_net_df2 = merged_asst_lib_eq_net_df2.describe()
+print(desc_merged_asst_lib_eq_net_df2[['netincome', 'equity']])
+
+# plot graph, check the trend
+merged_plot32 = px.line(merged_asst_lib_eq_net_df2,
+                      x='end', y=['netincome', 'equity'],
+                      title="KR Net Income & Shareholders' Equity")
+
+# Update layout to set x-axis and y-axis title
+merged_plot32.update_layout(yaxis_title="Value in $")
+merged_plot32.update_layout(xaxis_title="Date")
+
+# Show the plot
+merged_plot32.show()
+
+# merge sales revenue data
+# print(merged_asst_lib_eq_net_df2['end'], revenue_df_filtered2['end'])
+# print(merged_asst_lib_eq_net_df2)
+# print(revenue_df_filtered2)
+
+# end date in other data points are at the beginning of month different than in the revenue file which is at the end of Sept, need to extract year to join by year.
+merged_asst_lib_eq_net_df2['year'] = merged_asst_lib_eq_net_df2['end'].dt.year
+revenue_df_filtered2['year'] = revenue_df_filtered2['end'].dt.year
+
+# merge revenue data to the other data
+merged_asst_lib_eq_net_rev_df2 = pd.merge(merged_asst_lib_eq_net_df2, revenue_df_filtered2, on='year')
+# print(merged_asst_lib_eq_net_rev_df2.columns)
+merged_asst_lib_eq_net_rev_df2 = merged_asst_lib_eq_net_rev_df2.drop(merged_asst_lib_eq_net_rev_df2.columns[14:], axis=1)
+merged_asst_lib_eq_net_rev_df2 = merged_asst_lib_eq_net_rev_df2.rename(columns={'val': 'revenue', 'end_x':'end'})
+
+# drop unused columns
+merged_asst_lib_eq_net_rev_df2 = merged_asst_lib_eq_net_rev_df2.drop(columns=['year', 'end_y'])
+
+print(merged_asst_lib_eq_net_rev_df2) # 7 rows
+
+desc_merged_asst_lib_eq_net_rev_df2 = merged_asst_lib_eq_net_rev_df2.describe()
+print(desc_merged_asst_lib_eq_net_rev_df2[['netincome', 'revenue']])
+
+# what is the liabilities trend?
+merged_plot42 = px.line(merged_asst_lib_eq_net_rev_df2,
+                      x='end', y=['netincome', 'revenue'],
+                      title="KR Net Income & Total Revenue")
+
+# Update layout to set x-axis and y-axis title
+merged_plot42.update_layout(yaxis_title="Value in $")
+merged_plot42.update_layout(xaxis_title="Date")
+
+# Show the plot
+merged_plot42.show()
+
+# merge current assets and current liabilities
+# print(cur_assets_df_filtered2)
+# print(cur_liabilities_df_filtered2)
+merged_cur_asst_lib_df2 = pd.merge(cur_assets_df_filtered2, cur_liabilities_df_filtered2, on=['accn', 'end'], how='inner')
+merged_cur_asst_lib_df2 = merged_cur_asst_lib_df2.drop(merged_cur_asst_lib_df2.columns[9:], axis=1)
+merged_cur_asst_lib_df2 = merged_cur_asst_lib_df2.rename(columns={'val_x': 'current_assets', 'val_y': 'current_liabilities'})
+print(merged_cur_asst_lib_df2) # 15 rows end 2008-09-27 to 2023-09-30
+
+# get summaries of merged dataframe
+desc_merged_cur_asst_lib_df2 = merged_cur_asst_lib_df2.describe()
+print(desc_merged_cur_asst_lib_df2[['current_assets', 'current_liabilities']])
+
+# what is the liabilities trend?
+merged_plot52 = px.line(merged_cur_asst_lib_df2,
+                      x='end', y=['current_assets', 'current_liabilities'],
+                      title="KR Current Assets & Current Liabilities")
+
+# Update layout to set x-axis and y-axis title
+merged_plot52.update_layout(yaxis_title="Value in $")
+merged_plot52.update_layout(xaxis_title="Date")
+
+# Show the plot
+merged_plot52.show() # upward trend almost parallel to each other. less working capital between 2009-2011 then increasing over time.
+
+""" Ratios """
+# 1. Current ratio = Current Assets / Current Liabilities
+# this ratio help us understand the company's finanical strength, how likely the company can meet its' obligations.
+
+merged_cur_asst_lib_df2['current_ratio'] = merged_cur_asst_lib_df2['current_assets']/ merged_cur_asst_lib_df2['current_liabilities']
+# print(merged_asst_lib_df)
+
+# create a table
+current_ratio_table2 = tabulate(merged_cur_asst_lib_df2[['end', 'current_ratio']], headers='keys', tablefmt='pretty')
+print(current_ratio_table2)
+
+current_ratio_plot2 = px.line(merged_cur_asst_lib_df2,
+                      x='end', y='current_ratio',
+                      title="KR Current Ratio")
+current_ratio_plot2.update_yaxes(range=[0, max(merged_cur_asst_lib_df2['current_ratio']+1)])
+
+# Update layout to set x-axis and y-axis title
+current_ratio_plot2.update_layout(yaxis_title="Value in $")
+current_ratio_plot2.update_layout(xaxis_title="Date")
+
+current_ratio_plot2.show()
+
+# 2. Debt-to-Equity Ratio (D/E) = Total liabilities / Total shareholders' Equity
+# this ratio help us understand the net worth of the company by comparing the total shareholders' equity to its total liabilities
+
+merged_asst_lib_eq_df2['debt_to_equity_ratio'] = merged_asst_lib_eq_df2['liabilities']/merged_asst_lib_eq_df2['equity']
+print(merged_asst_lib_eq_df2)
+
+# create a table
+de_ratio_table2 = tabulate(merged_asst_lib_eq_df2[['end', 'debt_to_equity_ratio']], headers='keys', tablefmt='pretty')
+print(de_ratio_table2)
+
+debt_to_equity_ratio_plot2 = px.line(merged_asst_lib_eq_df2,
+                      x='end', y='debt_to_equity_ratio',
+                      title="KR Debt-to-Equity Ratio",
+                                    labels={
+                                        "debt_to_equity_ratio": "Debt-to-Equity Ratio",
+                                        "end": "Date"
+                                    })
+debt_to_equity_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_df2['debt_to_equity_ratio'])])
+
+debt_to_equity_ratio_plot2.show()
+
+# 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
+# this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
+
+merged_asst_lib_eq_net_df2['roe_ratio'] = merged_asst_lib_eq_net_df2['netincome'] / merged_asst_lib_eq_net_df2['equity']
+# print(merged_asst_lib_eq_net_df)
+
+# create a table
+roe_ratio_table2 = tabulate(merged_asst_lib_eq_net_df2[['end', 'roe_ratio']], headers='keys', tablefmt='pretty')
+print(roe_ratio_table2)
+
+roe_ratio_plot2 = px.line(merged_asst_lib_eq_net_df2,
+                      x='end', y='roe_ratio',
+                      title="KR Return on Equity Ratio",
+                                    labels={
+                                        'roe_ratio': "Return on Equity Ratio",
+                                        "end": "Date"
+                                    })
+roe_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df2['roe_ratio'])])
+
+roe_ratio_plot2.show()
+
+# 4. Net Profit Margin = Net Income/Total Revenue
+merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'] = merged_asst_lib_eq_net_rev_df2['netincome'] / merged_asst_lib_eq_net_rev_df2['revenue']
+# print(merged_asst_lib_eq_net_rev_df2)
+
+# create a table
+netprofitmargin_ratio_table2 = tabulate(merged_asst_lib_eq_net_rev_df2[['end', 'netprofitmargin_ratio']], headers='keys', tablefmt='pretty')
+print(netprofitmargin_ratio_table2)
+
+netprofmargin_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df2,
+                      x='end', y='netprofitmargin_ratio',
+                      title="KR Net Profit Margin Ratio",
+                                    labels={
+                                        'netprofitmargin_ratio': "Net Profit Margin Ratio",
+                                        "end": "Date"
+                                    })
+netprofmargin_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'])])
+
+netprofmargin_ratio_plot2.show()
+
+print(merged_asst_lib_eq_net_rev_df2[['end','revenue', 'assets']])
+
+# 5. Asset Turnover Ratio = Total Revenue / (Beginning Assets + Ending Assets)/2)
+# Calculate rolling average of total assets
+window_size = 2
+merged_asst_lib_eq_net_rev_df2['rolling_avg_assets'] = merged_asst_lib_eq_net_rev_df2['assets'].rolling(window=window_size).mean()
+
+# Calculate asset turnover
+merged_asst_lib_eq_net_rev_df2['asset_turnover_ratio'] = merged_asst_lib_eq_net_rev_df2['revenue'] / merged_asst_lib_eq_net_rev_df2['rolling_avg_assets']
+print(merged_asst_lib_eq_net_rev_df2)
+
+# create a table
+asset_turnover_ratio_table2 = tabulate(merged_asst_lib_eq_net_rev_df2[['end', 'asset_turnover_ratio']], headers='keys', tablefmt='pretty')
+print(asset_turnover_ratio_table2)
+
+asset_turnover_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df2,
+                      x='end', y='asset_turnover_ratio',
+                      title="KR asset_turnover Ratio",
+                                    labels={
+                                        'asset_turnover_ratio': "Asset Turnover Ratio",
+                                        "end": "Date"
+                                    })
+asset_turnover_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['asset_turnover_ratio'])])
+
+asset_turnover_ratio_plot2.show()
+
+
 
 print('End of code. Thank you.')
