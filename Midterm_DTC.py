@@ -26,7 +26,7 @@ pd.set_option('display.max_columns', 3000)
 pd.options.plotting.backend = 'plotly'
 
 # set number float format
-pd.options.display.float_format = '{:.3f}'.format
+pd.options.display.float_format = '{:.2f}'.format
 
 # function to get cik_str for the selected company
 def search_comp(ticker):
@@ -148,9 +148,6 @@ print(cur_liabilities_df.info())
 # print(cur_liabilities_df['form'].unique()) # has multiple form ['10-K/A' '10-Q' '10-K' '8-K']
 
 # observation, same as AssetsCurrent, there are multiple period, calendar year and quarterly. Different period of data can be filed at the same time.
-
-# statistics summary
-print(cur_liabilities_df.describe())
 
 # get stockholders' equity
 """
@@ -514,10 +511,14 @@ current_ratio_plot = px.line(merged_cur_asst_lib_df,
 current_ratio_plot.update_yaxes(range=[0, max(merged_cur_asst_lib_df['current_ratio']+1)])
 
 # Update layout to set x-axis and y-axis title
-current_ratio_plot.update_layout(yaxis_title="Value in $")
+current_ratio_plot.update_layout(yaxis_title="Ratio")
 current_ratio_plot.update_layout(xaxis_title="Date")
 
 current_ratio_plot.show()
+
+# check growth rate
+merged_cur_asst_lib_df['cur_growth_rate'] = ((merged_cur_asst_lib_df['current_ratio'].shift(-1) - merged_cur_asst_lib_df['current_ratio']) / merged_cur_asst_lib_df['current_ratio']) * 100
+print(merged_cur_asst_lib_df[['end', 'current_ratio', 'cur_growth_rate']])
 
 # 2. Debt-to-Equity Ratio (D/E) = Total liabilities / Total shareholders' Equity
 # this ratio help us understand the net worth of the company by comparing the total shareholders' equity to its total liabilities
@@ -535,6 +536,10 @@ debt_to_equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_df['debt
 
 debt_to_equity_ratio_plot.show()
 
+# check growth rate
+merged_asst_lib_eq_df['DE_growthrate'] = ((merged_asst_lib_eq_df['debt_to_equity_ratio'].shift(-1) - merged_asst_lib_eq_df['debt_to_equity_ratio']) / merged_asst_lib_eq_df['debt_to_equity_ratio']) * 100
+print(merged_asst_lib_eq_df[['end', 'debt_to_equity_ratio','DE_growthrate']])
+
 # 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
 # this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
 
@@ -550,7 +555,14 @@ roe_ratio_plot = px.line(merged_asst_lib_eq_net_df,
                                     })
 roe_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df['roe_ratio'])])
 
+# Update y-axis interval to align with the first company
+roe_ratio_plot.update_layout(yaxis=dict(dtick=0.05, range=[0, 2]))
+
 roe_ratio_plot.show()
+
+# check growth rate
+merged_asst_lib_eq_net_df['roe_growthrate'] = ((merged_asst_lib_eq_net_df['roe_ratio'].shift(-1) - merged_asst_lib_eq_net_df['roe_ratio']) / merged_asst_lib_eq_net_df['roe_ratio']) * 100
+print(merged_asst_lib_eq_net_df[['end', 'roe_ratio','roe_growthrate']])
 
 # 4. Net Profit Margin = Net Income/Total Revenue
 merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio'] = merged_asst_lib_eq_net_rev_df['netincome'] / merged_asst_lib_eq_net_rev_df['revenue']
@@ -565,9 +577,17 @@ netprofmargin_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df,
                                     })
 netprofmargin_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio'])])
 
+# Update y-axis interval to align with the first company
+netprofmargin_ratio_plot.update_layout(yaxis=dict(dtick=0.004, range=[0, 0.26]))
+
 netprofmargin_ratio_plot.show()
 
-print(merged_asst_lib_eq_net_rev_df[['end','revenue', 'assets']])
+# check growth rate
+merged_asst_lib_eq_net_rev_df['netprofitmargin_growthrate'] = ((merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio']) / merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df[['end', 'netprofitmargin_ratio','netprofitmargin_growthrate']])
+
+# print(merged_asst_lib_eq_net_rev_df[['end','revenue', 'assets']])
+
 # 5. Asset Turnover Ratio = Total Revenue / (Beginning Assets + Ending Assets)/2)
 # merged_asst_lib_eq_net_rev_df.loc['assetturnover_ratio'] = merged_asst_lib_eq_net_rev_df.loc['revenue'] / merged_asst_lib_eq_net_rev_df.loc['assets'].rolling(2).mean()
 # Calculate average total assets
@@ -589,9 +609,34 @@ asset_turnover_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df,
                                         'asset_turnover_ratio': "Asset Turnover Ratio",
                                         "end": "Date"
                                     })
-asset_turnover_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df['asset_turnover_ratio'])])
-
+# update y-axis to start with 0
+asset_turnover_ratio_plot.update_layout(yaxis=dict(dtick=0.5, range=[0, 8.5]))
 asset_turnover_ratio_plot.show()
+
+# growth rate
+merged_asst_lib_eq_net_rev_df['assetsturnover_growthrate'] = ((merged_asst_lib_eq_net_rev_df['asset_turnover_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df['asset_turnover_ratio']) / merged_asst_lib_eq_net_rev_df['asset_turnover_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df[['end', 'asset_turnover_ratio','assetsturnover_growthrate']])
+
+# 6.Equity Ratio = Shareholder's Equity / Total Assets
+# a leverage ratio that measures the portion of company resources that are funded by contributions of its equity participants and its earnings.
+# Companies with a high equity ratio are known as “conservative” companies.
+merged_asst_lib_eq_net_rev_df['equity_ratio'] = merged_asst_lib_eq_net_rev_df['equity'] / merged_asst_lib_eq_net_rev_df['assets']
+print(merged_asst_lib_eq_net_rev_df)
+
+equity_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df,
+                      x='end', y='equity_ratio',
+                      title="AAPL Equity Ratio",
+                                    labels={
+                                        'equity_ratio': "Equity Ratio",
+                                        "end": "Date"
+                                    })
+equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df['equity_ratio'])])
+
+equity_ratio_plot.show()
+
+# Growth Rate
+merged_asst_lib_eq_net_rev_df['equity_growthrate'] = ((merged_asst_lib_eq_net_rev_df['equity_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df['equity_ratio']) / merged_asst_lib_eq_net_rev_df['equity_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df[['end', 'equity_ratio','equity_growthrate']])
 
 """
 Second company = Kroger Co. (KR)
@@ -1056,11 +1101,18 @@ current_ratio_plot2 = px.line(merged_cur_asst_lib_df2,
                       title="KR Current Ratio")
 current_ratio_plot2.update_yaxes(range=[0, max(merged_cur_asst_lib_df2['current_ratio']+1)])
 
+# Update y-axis interval to 0.5 to align with the first company
+current_ratio_plot2.update_layout(yaxis=dict(dtick=0.5, range=[0, 3.5]))
+
 # Update layout to set x-axis and y-axis title
-current_ratio_plot2.update_layout(yaxis_title="Value in $")
+current_ratio_plot2.update_layout(yaxis_title="Ratio")
 current_ratio_plot2.update_layout(xaxis_title="Date")
 
 current_ratio_plot2.show()
+
+# check growth rate
+merged_cur_asst_lib_df2['cur_growth_rate'] = ((merged_cur_asst_lib_df2['current_ratio'].shift(-1) - merged_cur_asst_lib_df2['current_ratio']) / merged_cur_asst_lib_df2['current_ratio']) * 100
+print(merged_cur_asst_lib_df2[['end', 'current_ratio', 'cur_growth_rate']])
 
 # 2. Debt-to-Equity Ratio (D/E) = Total liabilities / Total shareholders' Equity
 # this ratio help us understand the net worth of the company by comparing the total shareholders' equity to its total liabilities
@@ -1081,7 +1133,15 @@ debt_to_equity_ratio_plot2 = px.line(merged_asst_lib_eq_df2,
                                     })
 debt_to_equity_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_df2['debt_to_equity_ratio'])])
 
+# Update y-axis interval to align with the first company
+debt_to_equity_ratio_plot2.update_layout(yaxis=dict(dtick=1, range=[0, 6]))
+
 debt_to_equity_ratio_plot2.show()
+
+# check growth rate
+merged_asst_lib_eq_df2['DE_growthrate'] = ((merged_asst_lib_eq_df2['debt_to_equity_ratio'].shift(-1) - merged_asst_lib_eq_df2['debt_to_equity_ratio']) / merged_asst_lib_eq_df2['debt_to_equity_ratio']) * 100
+print(merged_asst_lib_eq_df2[['end', 'debt_to_equity_ratio','DE_growthrate']])
+
 
 # 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
 # this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
@@ -1100,9 +1160,14 @@ roe_ratio_plot2 = px.line(merged_asst_lib_eq_net_df2,
                                         'roe_ratio': "Return on Equity Ratio",
                                         "end": "Date"
                                     })
-roe_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df2['roe_ratio'])])
 
+# Update y-axis interval to align with the first company
+roe_ratio_plot2.update_layout(yaxis=dict(dtick=0.05, range=[0, 2]))
 roe_ratio_plot2.show()
+
+# check growth rate
+merged_asst_lib_eq_net_df2['roe_growthrate'] = ((merged_asst_lib_eq_net_df2['roe_ratio'].shift(-1) - merged_asst_lib_eq_net_df2['roe_ratio']) / merged_asst_lib_eq_net_df2['roe_ratio']) * 100
+print(merged_asst_lib_eq_net_df2[['end', 'roe_ratio','roe_growthrate']])
 
 # 4. Net Profit Margin = Net Income/Total Revenue
 merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'] = merged_asst_lib_eq_net_rev_df2['netincome'] / merged_asst_lib_eq_net_rev_df2['revenue']
@@ -1119,11 +1184,16 @@ netprofmargin_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df2,
                                         'netprofitmargin_ratio': "Net Profit Margin Ratio",
                                         "end": "Date"
                                     })
-netprofmargin_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'])])
+# netprofmargin_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'])])
 
+# Update y-axis interval to align with the first company
+netprofmargin_ratio_plot2.update_layout(yaxis=dict(dtick=0.004, range=[0, 0.26]))
 netprofmargin_ratio_plot2.show()
 
-print(merged_asst_lib_eq_net_rev_df2[['end','revenue', 'assets']])
+# check growth rate
+merged_asst_lib_eq_net_rev_df2['netprofitmargin_growthrate'] = ((merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio']) / merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df2[['end', 'netprofitmargin_ratio','netprofitmargin_growthrate']])
+
 
 # 5. Asset Turnover Ratio = Total Revenue / (Beginning Assets + Ending Assets)/2)
 # Calculate rolling average of total assets
@@ -1147,8 +1217,41 @@ asset_turnover_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df2,
                                     })
 asset_turnover_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['asset_turnover_ratio'])])
 
+# Update y-axis interval to align with the first company
+asset_turnover_ratio_plot2.update_layout(yaxis=dict(dtick=0.5, range=[0, 8.5]))
 asset_turnover_ratio_plot2.show()
 
+# growth rate
+merged_asst_lib_eq_net_rev_df2['assetsturnover_growthrate'] = ((merged_asst_lib_eq_net_rev_df2['asset_turnover_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df2['asset_turnover_ratio']) / merged_asst_lib_eq_net_rev_df2['asset_turnover_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df2[['end', 'asset_turnover_ratio','assetsturnover_growthrate']])
 
+# 6.Equity Ratio = Shareholder's Equity / Total Assets
+# a leverage ratio that measures the portion of company resources that are funded by contributions of its equity participants and its earnings. Companies with a high equity ratio are known as “conservative” companies.
+merged_asst_lib_eq_net_rev_df2['equity_ratio'] = merged_asst_lib_eq_net_rev_df2['equity'] / merged_asst_lib_eq_net_rev_df2['assets']
+print(merged_asst_lib_eq_net_rev_df2)
+
+equity_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df2,
+                      x='end', y='equity_ratio',
+                      title="AAPL Equity Ratio",
+                                    labels={
+                                        'equity_ratio': "Equity Ratio",
+                                        "end": "Date"
+                                    })
+equity_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['equity_ratio'])])
+
+# Update y-axis interval to align with the first company
+equity_ratio_plot2.update_layout(yaxis=dict(dtick=0.05, range=[0,0.35]))
+
+# print plot
+equity_ratio_plot2.show()
+
+# Growth Rate
+merged_asst_lib_eq_net_rev_df2['equity_growthrate'] = ((merged_asst_lib_eq_net_rev_df2['equity_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df2['equity_ratio']) / merged_asst_lib_eq_net_rev_df2['equity_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df2[['end', 'equity_ratio','equity_growthrate']])
+
+merged_cur_asst_lib_df.to_excel('result_curr.xlsx', index=False)
+merged_asst_lib_eq_net_rev_df.to_excel('result_all.xlsx', index=False)
+merged_cur_asst_lib_df2.to_excel('result_curr2.xlsx', index=False)
+merged_asst_lib_eq_net_rev_df2.to_excel('result_all2.xlsx', index=False)
 
 print('End of code. Thank you.')
