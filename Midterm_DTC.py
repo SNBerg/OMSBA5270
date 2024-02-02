@@ -508,7 +508,8 @@ merged_cur_asst_lib_df['current_ratio'] = merged_cur_asst_lib_df['current_assets
 # normalized to based year
 merged_cur_asst_lib_df['end'] = pd.to_datetime(merged_cur_asst_lib_df['end'])
 merged_cur_asst_lib_df_filtered = merged_cur_asst_lib_df.loc[merged_cur_asst_lib_df['end'] > '2016-01-01']
-print(merged_cur_asst_lib_df_filtered)
+# print(merged_cur_asst_lib_df_filtered)
+
 current_ratio_plot = px.line(merged_cur_asst_lib_df_filtered,
                       x='end', y='current_ratio',
                       title="AAPL Current Ratio")
@@ -521,28 +522,34 @@ current_ratio_plot.update_layout(xaxis_title="Date")
 current_ratio_plot.show()
 
 # check growth rate
-merged_cur_asst_lib_df['currentratio_growthrate'] = ((merged_cur_asst_lib_df['current_ratio'].shift(-1) - merged_cur_asst_lib_df['current_ratio']) / merged_cur_asst_lib_df['current_ratio']) * 100
-print(merged_cur_asst_lib_df[['end', 'current_ratio', 'currentratio_growthrate']])
+merged_cur_asst_lib_df_filtered['currentratio_growthrate'] = ((merged_cur_asst_lib_df_filtered['current_ratio'].shift(-1) - merged_cur_asst_lib_df_filtered['current_ratio']) / merged_cur_asst_lib_df_filtered['current_ratio']) * 100
+print(merged_cur_asst_lib_df_filtered[['end', 'current_ratio', 'currentratio_growthrate']])
 
 # 2. Debt-to-Equity Ratio (D/E) = Total liabilities / Total shareholders' Equity
 # this ratio help us understand the net worth of the company by comparing the total shareholders' equity to its total liabilities
 
 merged_asst_lib_eq_df['debt_to_equity_ratio'] = merged_asst_lib_eq_df['liabilities']/merged_asst_lib_eq_df['equity']
 print(merged_asst_lib_eq_df)
-debt_to_equity_ratio_plot = px.line(merged_asst_lib_eq_df,
+
+# normalized to based year
+merged_asst_lib_eq_df['end'] = pd.to_datetime(merged_asst_lib_eq_df['end'])
+merged_asst_lib_eq_df_filtered = merged_asst_lib_eq_df.loc[merged_asst_lib_eq_df['end'] > '2016-01-01']
+# print(merged_asst_lib_eq_df_filtered)
+
+debt_to_equity_ratio_plot = px.line(merged_asst_lib_eq_df_filtered,
                       x='end', y='debt_to_equity_ratio',
                       title="AAPL Debt-to-Equity Ratio",
                                     labels={
                                         "debt_to_equity_ratio": "Debt-to-Equity Ratio",
                                         "end": "Date"
                                     })
-debt_to_equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_df['debt_to_equity_ratio'])])
+debt_to_equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_df_filtered['debt_to_equity_ratio'])])
 
 debt_to_equity_ratio_plot.show()
 
 # check growth rate
-merged_asst_lib_eq_df['DE_growthrate'] = ((merged_asst_lib_eq_df['debt_to_equity_ratio'].shift(-1) - merged_asst_lib_eq_df['debt_to_equity_ratio']) / merged_asst_lib_eq_df['debt_to_equity_ratio']) * 100
-print(merged_asst_lib_eq_df[['end', 'debt_to_equity_ratio','DE_growthrate']])
+merged_asst_lib_eq_df_filtered['DE_growthrate'] = ((merged_asst_lib_eq_df_filtered['debt_to_equity_ratio'].shift(-1) - merged_asst_lib_eq_df_filtered['debt_to_equity_ratio']) / merged_asst_lib_eq_df_filtered['debt_to_equity_ratio']) * 100
+print(merged_asst_lib_eq_df_filtered[['end', 'debt_to_equity_ratio','DE_growthrate']])
 
 # 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
 # this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
@@ -550,14 +557,19 @@ print(merged_asst_lib_eq_df[['end', 'debt_to_equity_ratio','DE_growthrate']])
 merged_asst_lib_eq_net_df['roe_ratio'] = merged_asst_lib_eq_net_df['netincome'] / merged_asst_lib_eq_net_df['equity']
 # print(merged_asst_lib_eq_net_df)
 
-roe_ratio_plot = px.line(merged_asst_lib_eq_net_df,
+# normalized to based year
+merged_asst_lib_eq_net_df['end'] = pd.to_datetime(merged_asst_lib_eq_net_df['end'])
+merged_asst_lib_eq_net_df_filtered = merged_asst_lib_eq_net_df.loc[merged_asst_lib_eq_net_df['end'] > '2016-01-01']
+# print(merged_asst_lib_eq_net_df_filtered)
+
+roe_ratio_plot = px.line(merged_asst_lib_eq_net_df_filtered,
                       x='end', y='roe_ratio',
                       title="AAPL Return on Equity Ratio",
                                     labels={
                                         'roe_ratio': "Return on Equity Ratio",
                                         "end": "Date"
                                     })
-roe_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df['roe_ratio'])])
+roe_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df_filtered['roe_ratio'])])
 
 # Update y-axis interval to align with the first company
 roe_ratio_plot.update_layout(yaxis=dict(dtick=0.05, range=[0, 2]))
@@ -565,8 +577,8 @@ roe_ratio_plot.update_layout(yaxis=dict(dtick=0.05, range=[0, 2]))
 roe_ratio_plot.show()
 
 # check growth rate
-merged_asst_lib_eq_net_df['roe_growthrate'] = ((merged_asst_lib_eq_net_df['roe_ratio'].shift(-1) - merged_asst_lib_eq_net_df['roe_ratio']) / merged_asst_lib_eq_net_df['roe_ratio']) * 100
-print(merged_asst_lib_eq_net_df[['end', 'roe_ratio','roe_growthrate']])
+merged_asst_lib_eq_net_df_filtered['roe_growthrate'] = ((merged_asst_lib_eq_net_df_filtered['roe_ratio'].shift(-1) - merged_asst_lib_eq_net_df_filtered['roe_ratio']) / merged_asst_lib_eq_net_df_filtered['roe_ratio']) * 100
+print(merged_asst_lib_eq_net_df_filtered[['end', 'roe_ratio','roe_growthrate']])
 
 # 4. Net Profit Margin = Net Income/Total Revenue
 merged_asst_lib_eq_net_rev_df['netprofitmargin_ratio'] = merged_asst_lib_eq_net_rev_df['netincome'] / merged_asst_lib_eq_net_rev_df['revenue']
@@ -627,36 +639,40 @@ print(merged_asst_lib_eq_net_rev_df[['end', 'asset_turnover_ratio','assetsturnov
 merged_asst_lib_eq_net_rev_df['equity_ratio'] = merged_asst_lib_eq_net_rev_df['equity'] / merged_asst_lib_eq_net_rev_df['assets']
 print(merged_asst_lib_eq_net_rev_df)
 
-equity_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df,
+# normalized to based year
+merged_asst_lib_eq_net_rev_df['end'] = pd.to_datetime(merged_asst_lib_eq_net_rev_df['end'])
+merged_asst_lib_eq_net_rev_df_filtered = merged_asst_lib_eq_net_rev_df.loc[merged_asst_lib_eq_net_rev_df['end'] > '2016-01-01']
+# print(merged_asst_lib_eq_net_df_filtered)
+
+equity_ratio_plot = px.line(merged_asst_lib_eq_net_rev_df_filtered,
                       x='end', y='equity_ratio',
                       title="AAPL Equity Ratio",
                                     labels={
                                         'equity_ratio': "Equity Ratio",
                                         "end": "Date"
                                     })
-equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df['equity_ratio'])])
+equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df_filtered['equity_ratio'])])
 
 equity_ratio_plot.show()
 
 # Growth Rate
-merged_asst_lib_eq_net_rev_df['equity_growthrate'] = ((merged_asst_lib_eq_net_rev_df['equity_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df['equity_ratio']) / merged_asst_lib_eq_net_rev_df['equity_ratio']) * 100
-print(merged_asst_lib_eq_net_rev_df[['end', 'equity_ratio','equity_growthrate']])
+merged_asst_lib_eq_net_rev_df_filtered['equity_growthrate'] = ((merged_asst_lib_eq_net_rev_df_filtered['equity_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df_filtered['equity_ratio']) / merged_asst_lib_eq_net_rev_df_filtered['equity_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df_filtered[['end', 'equity_ratio','equity_growthrate']])
 
 # print ratios and growth rate
 # Current Ratio
-merged_cur_asst_lib_df['end'] = pd.to_datetime(merged_cur_asst_lib_df['end'])
-merged_cur_asst_lib_df['year'] = merged_cur_asst_lib_df['end'].dt.year.astype(str)
-current_ratio_table = tabulate(merged_cur_asst_lib_df[['year', 'current_ratio', 'currentratio_growthrate']], headers='keys', tablefmt='pretty')
+merged_cur_asst_lib_df_filtered['year'] = merged_cur_asst_lib_df_filtered['end'].dt.year.astype(str)
+current_ratio_table = tabulate(merged_cur_asst_lib_df_filtered[['year', 'current_ratio', 'currentratio_growthrate']], headers='keys', tablefmt='pretty')
 print(current_ratio_table)
 
 # D/E
-merged_asst_lib_eq_df['year'] = merged_asst_lib_eq_df['end'].dt.year.astype(str)
-DE_ratio_table = tabulate(merged_asst_lib_eq_df[['year', 'debt_to_equity_ratio', 'DE_growthrate']], headers='keys', tablefmt='pretty')
+merged_asst_lib_eq_df_filtered['year'] = merged_asst_lib_eq_df_filtered['end'].dt.year.astype(str)
+DE_ratio_table = tabulate(merged_asst_lib_eq_df_filtered[['year', 'debt_to_equity_ratio', 'DE_growthrate']], headers='keys', tablefmt='pretty')
 print(DE_ratio_table)
 
 # Return on Equity
-merged_asst_lib_eq_net_df['year'] = merged_asst_lib_eq_net_df['end'].dt.year.astype(str)
-roe_ratio_table = tabulate(merged_asst_lib_eq_net_df[['year', 'roe_ratio', 'roe_growthrate']], headers='keys', tablefmt='pretty')
+merged_asst_lib_eq_net_df_filtered['year'] = merged_asst_lib_eq_net_df_filtered['end'].dt.year.astype(str)
+roe_ratio_table = tabulate(merged_asst_lib_eq_net_df_filtered[['year', 'roe_ratio', 'roe_growthrate']], headers='keys', tablefmt='pretty')
 print(roe_ratio_table)
 
 # Net profit margin
@@ -671,8 +687,8 @@ assetsturnover_ratio_table = tabulate(merged_asst_lib_eq_net_rev_df[['year', 'as
 print(assetsturnover_ratio_table)
 
 # Equity ratio
-merged_asst_lib_eq_net_rev_df['year'] = merged_asst_lib_eq_net_rev_df['end'].dt.year.astype(str)
-equity_ratio_table = tabulate(merged_asst_lib_eq_net_rev_df[['year', 'equity_ratio', 'equity_growthrate']], headers='keys', tablefmt='pretty')
+merged_asst_lib_eq_net_rev_df_filtered['year'] = merged_asst_lib_eq_net_rev_df_filtered['end'].dt.year.astype(str)
+equity_ratio_table = tabulate(merged_asst_lib_eq_net_rev_df_filtered[['year', 'equity_ratio', 'equity_growthrate']], headers='keys', tablefmt='pretty')
 print(equity_ratio_table)
 
 """
@@ -1134,11 +1150,12 @@ print(current_ratio_table2)
 
 # normalized to based year
 merged_cur_asst_lib_df2['end'] = pd.to_datetime(merged_cur_asst_lib_df2['end'])
-merged_cur_asst_lib_df_filtered2 = merged_cur_asst_lib_df.loc[merged_cur_asst_lib_df2['end'] > '2016-01-01']
+merged_cur_asst_lib_df_filtered2 = merged_cur_asst_lib_df2.loc[merged_cur_asst_lib_df2['end'] > '2016-01-01']
 print(merged_cur_asst_lib_df_filtered2)
+
 current_ratio_plot2 = px.line(merged_cur_asst_lib_df_filtered2,
                       x='end', y='current_ratio',
-                      title="AAPL Current Ratio")
+                      title="KR Current Ratio")
 current_ratio_plot2.update_yaxes(range=[0, max(merged_cur_asst_lib_df_filtered2['current_ratio']+1)])
 
 # Update y-axis interval to 0.5 to align with the first company
@@ -1151,8 +1168,8 @@ current_ratio_plot2.update_layout(xaxis_title="Date")
 current_ratio_plot2.show()
 
 # check growth rate
-merged_cur_asst_lib_df2['currentratio_growthrate'] = ((merged_cur_asst_lib_df2['current_ratio'].shift(-1) - merged_cur_asst_lib_df2['current_ratio']) / merged_cur_asst_lib_df2['current_ratio']) * 100
-print(merged_cur_asst_lib_df2[['end', 'current_ratio', 'currentratio_growthrate']])
+merged_cur_asst_lib_df_filtered2['currentratio_growthrate'] = ((merged_cur_asst_lib_df_filtered2['current_ratio'].shift(-1) - merged_cur_asst_lib_df_filtered2['current_ratio']) / merged_cur_asst_lib_df_filtered2['current_ratio']) * 100
+print(merged_cur_asst_lib_df_filtered2[['end', 'current_ratio', 'currentratio_growthrate']])
 
 # 2. Debt-to-Equity Ratio (D/E) = Total liabilities / Total shareholders' Equity
 # this ratio help us understand the net worth of the company by comparing the total shareholders' equity to its total liabilities
@@ -1160,54 +1177,57 @@ print(merged_cur_asst_lib_df2[['end', 'current_ratio', 'currentratio_growthrate'
 merged_asst_lib_eq_df2['debt_to_equity_ratio'] = merged_asst_lib_eq_df2['liabilities']/merged_asst_lib_eq_df2['equity']
 print(merged_asst_lib_eq_df2)
 
-# create a table
-de_ratio_table2 = tabulate(merged_asst_lib_eq_df2[['end', 'debt_to_equity_ratio']], headers='keys', tablefmt='pretty')
-print(de_ratio_table2)
+# normalized to based year
+merged_asst_lib_eq_df2['end'] = pd.to_datetime(merged_asst_lib_eq_df2['end'])
+merged_asst_lib_eq_df_filtered2 = merged_asst_lib_eq_df2.loc[merged_asst_lib_eq_df2['end'] > '2016-01-01']
+# print(merged_asst_lib_eq_df_filtered)
 
-debt_to_equity_ratio_plot2 = px.line(merged_asst_lib_eq_df2,
+debt_to_equity_ratio_plot2 = px.line(merged_asst_lib_eq_df_filtered2,
                       x='end', y='debt_to_equity_ratio',
                       title="KR Debt-to-Equity Ratio",
                                     labels={
                                         "debt_to_equity_ratio": "Debt-to-Equity Ratio",
                                         "end": "Date"
                                     })
-debt_to_equity_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_df2['debt_to_equity_ratio'])])
+# debt_to_equity_ratio_plot.update_yaxes(range=[0, max(merged_asst_lib_eq_df_filtered2['debt_to_equity_ratio'])])
 
-# Update y-axis interval to align with the first company
+# Update y-axis interval to 0.5 to align with the first company
 debt_to_equity_ratio_plot2.update_layout(yaxis=dict(dtick=1, range=[0, 6]))
 
 debt_to_equity_ratio_plot2.show()
 
 # check growth rate
-merged_asst_lib_eq_df2['DE_growthrate'] = ((merged_asst_lib_eq_df2['debt_to_equity_ratio'].shift(-1) - merged_asst_lib_eq_df2['debt_to_equity_ratio']) / merged_asst_lib_eq_df2['debt_to_equity_ratio']) * 100
-print(merged_asst_lib_eq_df2[['end', 'debt_to_equity_ratio','DE_growthrate']])
-
+merged_asst_lib_eq_df_filtered2['DE_growthrate'] = ((merged_asst_lib_eq_df_filtered2['debt_to_equity_ratio'].shift(-1) - merged_asst_lib_eq_df_filtered2['debt_to_equity_ratio']) / merged_asst_lib_eq_df_filtered2['debt_to_equity_ratio']) * 100
+print(merged_asst_lib_eq_df_filtered2[['end', 'debt_to_equity_ratio','DE_growthrate']])
 
 # 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
 # this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
 
 merged_asst_lib_eq_net_df2['roe_ratio'] = merged_asst_lib_eq_net_df2['netincome'] / merged_asst_lib_eq_net_df2['equity']
-# print(merged_asst_lib_eq_net_df)
+# print(merged_asst_lib_eq_net_df2)
 
-# create a table
-roe_ratio_table2 = tabulate(merged_asst_lib_eq_net_df2[['end', 'roe_ratio']], headers='keys', tablefmt='pretty')
-print(roe_ratio_table2)
+# normalized to based year
+merged_asst_lib_eq_net_df2['end'] = pd.to_datetime(merged_asst_lib_eq_net_df2['end'])
+merged_asst_lib_eq_net_df_filtered2 = merged_asst_lib_eq_net_df2.loc[merged_asst_lib_eq_net_df2['end'] > '2016-01-01']
+# print(merged_asst_lib_eq_net_df_filtered2)
 
-roe_ratio_plot2 = px.line(merged_asst_lib_eq_net_df2,
+roe_ratio_plot2 = px.line(merged_asst_lib_eq_net_df_filtered2,
                       x='end', y='roe_ratio',
                       title="KR Return on Equity Ratio",
                                     labels={
                                         'roe_ratio': "Return on Equity Ratio",
                                         "end": "Date"
                                     })
+roe_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_df_filtered2['roe_ratio'])])
 
 # Update y-axis interval to align with the first company
 roe_ratio_plot2.update_layout(yaxis=dict(dtick=0.05, range=[0, 2]))
+
 roe_ratio_plot2.show()
 
 # check growth rate
-merged_asst_lib_eq_net_df2['roe_growthrate'] = ((merged_asst_lib_eq_net_df2['roe_ratio'].shift(-1) - merged_asst_lib_eq_net_df2['roe_ratio']) / merged_asst_lib_eq_net_df2['roe_ratio']) * 100
-print(merged_asst_lib_eq_net_df2[['end', 'roe_ratio','roe_growthrate']])
+merged_asst_lib_eq_net_df_filtered2['roe_growthrate'] = ((merged_asst_lib_eq_net_df_filtered2['roe_ratio'].shift(-1) - merged_asst_lib_eq_net_df_filtered2['roe_ratio']) / merged_asst_lib_eq_net_df_filtered2['roe_ratio']) * 100
+print(merged_asst_lib_eq_net_df_filtered2[['end', 'roe_ratio','roe_growthrate']])
 
 # 4. Net Profit Margin = Net Income/Total Revenue
 merged_asst_lib_eq_net_rev_df2['netprofitmargin_ratio'] = merged_asst_lib_eq_net_rev_df2['netincome'] / merged_asst_lib_eq_net_rev_df2['revenue']
@@ -1270,40 +1290,45 @@ print(merged_asst_lib_eq_net_rev_df2[['end', 'asset_turnover_ratio','assetsturno
 merged_asst_lib_eq_net_rev_df2['equity_ratio'] = merged_asst_lib_eq_net_rev_df2['equity'] / merged_asst_lib_eq_net_rev_df2['assets']
 print(merged_asst_lib_eq_net_rev_df2)
 
-equity_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df2,
+# normalized to based year
+merged_asst_lib_eq_net_rev_df2['end'] = pd.to_datetime(merged_asst_lib_eq_net_rev_df2['end'])
+merged_asst_lib_eq_net_rev_df_filtered2 = merged_asst_lib_eq_net_rev_df2.loc[merged_asst_lib_eq_net_rev_df2['end'] > '2016-01-01']
+# print(merged_asst_lib_eq_net_df_filtered2)
+
+equity_ratio_plot2 = px.line(merged_asst_lib_eq_net_rev_df_filtered2,
                       x='end', y='equity_ratio',
-                      title="AAPL Equity Ratio",
+                      title="KR Equity Ratio",
                                     labels={
                                         'equity_ratio': "Equity Ratio",
                                         "end": "Date"
                                     })
-equity_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df2['equity_ratio'])])
+equity_ratio_plot2.update_yaxes(range=[0, max(merged_asst_lib_eq_net_rev_df_filtered2['equity_ratio'])])
 
 # Update y-axis interval to align with the first company
-equity_ratio_plot2.update_layout(yaxis=dict(dtick=0.05, range=[0,0.35]))
+equity_ratio_plot2.update_layout(yaxis=dict(dtick=0.05, range=[0, 0.35]))
+equity_ratio_plot2.show()
 
-# print plot
 equity_ratio_plot2.show()
 
 # Growth Rate
-merged_asst_lib_eq_net_rev_df2['equity_growthrate'] = ((merged_asst_lib_eq_net_rev_df2['equity_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df2['equity_ratio']) / merged_asst_lib_eq_net_rev_df2['equity_ratio']) * 100
-print(merged_asst_lib_eq_net_rev_df2[['end', 'equity_ratio','equity_growthrate']])
+merged_asst_lib_eq_net_rev_df_filtered2['equity_growthrate'] = ((merged_asst_lib_eq_net_rev_df_filtered2['equity_ratio'].shift(-1) - merged_asst_lib_eq_net_rev_df_filtered2['equity_ratio']) / merged_asst_lib_eq_net_rev_df_filtered2['equity_ratio']) * 100
+print(merged_asst_lib_eq_net_rev_df_filtered2[['end', 'equity_ratio','equity_growthrate']])
 
 # print ratios and growth rate
 # Current Ratio
-merged_cur_asst_lib_df2['end'] = pd.to_datetime(merged_cur_asst_lib_df2['end'])
-merged_cur_asst_lib_df2['year'] = merged_cur_asst_lib_df2['end'].dt.year.astype(str)
-current_ratio_table2 = tabulate(merged_cur_asst_lib_df2[['year', 'current_ratio', 'currentratio_growthrate']], headers='keys', tablefmt='pretty')
+merged_cur_asst_lib_df_filtered2['end'] = pd.to_datetime(merged_cur_asst_lib_df_filtered2['end'])
+merged_cur_asst_lib_df_filtered2['year'] = merged_cur_asst_lib_df_filtered2['end'].dt.year.astype(str)
+current_ratio_table2 = tabulate(merged_cur_asst_lib_df_filtered2[['year', 'current_ratio', 'currentratio_growthrate']], headers='keys', tablefmt='pretty')
 print(current_ratio_table2)
 
 # D/E
-merged_asst_lib_eq_df2['year'] = merged_asst_lib_eq_df2['end'].dt.year.astype(str)
-DE_ratio_table2 = tabulate(merged_asst_lib_eq_df2[['year', 'debt_to_equity_ratio', 'DE_growthrate']], headers='keys', tablefmt='pretty')
+merged_asst_lib_eq_df_filtered2['year'] = merged_asst_lib_eq_df_filtered2['end'].dt.year.astype(str)
+DE_ratio_table2 = tabulate(merged_asst_lib_eq_df_filtered2[['year', 'debt_to_equity_ratio', 'DE_growthrate']], headers='keys', tablefmt='pretty')
 print(DE_ratio_table2)
 
 # Return on Equity
-merged_asst_lib_eq_net_df2['year'] = merged_asst_lib_eq_net_df2['end'].dt.year.astype(str)
-roe_ratio_table2 = tabulate(merged_asst_lib_eq_net_df2[['year', 'roe_ratio', 'roe_growthrate']], headers='keys', tablefmt='pretty')
+merged_asst_lib_eq_net_df_filtered2['year'] = merged_asst_lib_eq_net_df_filtered2['end'].dt.year.astype(str)
+roe_ratio_table2 = tabulate(merged_asst_lib_eq_net_df_filtered2[['year', 'roe_ratio', 'roe_growthrate']], headers='keys', tablefmt='pretty')
 print(roe_ratio_table2)
 
 # Net profit margin
@@ -1318,8 +1343,8 @@ assetsturnover_ratio_table2 = tabulate(merged_asst_lib_eq_net_rev_df2[['year', '
 print(assetsturnover_ratio_table)
 
 # Equity ratio
-merged_asst_lib_eq_net_rev_df2['year'] = merged_asst_lib_eq_net_rev_df2['end'].dt.year.astype(str)
-equity_ratio_table2 = tabulate(merged_asst_lib_eq_net_rev_df2[['year', 'equity_ratio', 'equity_growthrate']], headers='keys', tablefmt='pretty')
+merged_asst_lib_eq_net_rev_df_filtered2['year'] = merged_asst_lib_eq_net_rev_df_filtered2['end'].dt.year.astype(str)
+equity_ratio_table2 = tabulate(merged_asst_lib_eq_net_rev_df_filtered2[['year', 'equity_ratio', 'equity_growthrate']], headers='keys', tablefmt='pretty')
 print(equity_ratio_table2)
 
 print('End of code. Thank you.')
