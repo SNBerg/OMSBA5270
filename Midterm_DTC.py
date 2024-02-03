@@ -16,6 +16,7 @@ import requests
 import pandas as pd
 import plotly.express as px
 from tabulate import tabulate # to create ratio tables
+import plotly.graph_objects as go # for combo chart
 
 # setup display so it shows all columns
 pd.options.display.width= None
@@ -666,12 +667,13 @@ current_ratio_table = tabulate(merged_cur_asst_lib_df_filtered[['year', 'current
 print(current_ratio_table)
 
 # D/E
-merged_asst_lib_eq_df_filtered['year'] = merged_asst_lib_eq_df_filtered['end'].dt.year.astype(str)
+merged_asst_lib_eq_df_filtered.loc[merged_asst_lib_eq_df_filtered['end'] > '2017-01-01', 'year'] = merged_asst_lib_eq_df_filtered['end'].dt.year.astype(str)
 DE_ratio_table = tabulate(merged_asst_lib_eq_df_filtered[['year', 'debt_to_equity_ratio', 'DE_growthrate']], headers='keys', tablefmt='pretty')
 print(DE_ratio_table)
 
 # Return on Equity
-merged_asst_lib_eq_net_df_filtered['year'] = merged_asst_lib_eq_net_df_filtered['end'].dt.year.astype(str)
+# using loc to avoid warning
+merged_asst_lib_eq_net_df_filtered.loc[merged_asst_lib_eq_net_df_filtered['end'] > '2017-01-01', 'year'] = merged_asst_lib_eq_net_df_filtered['end'].dt.year.astype(str)
 roe_ratio_table = tabulate(merged_asst_lib_eq_net_df_filtered[['year', 'roe_ratio', 'roe_growthrate']], headers='keys', tablefmt='pretty')
 print(roe_ratio_table)
 
@@ -690,6 +692,15 @@ print(assetsturnover_ratio_table)
 merged_asst_lib_eq_net_rev_df_filtered['year'] = merged_asst_lib_eq_net_rev_df_filtered['end'].dt.year.astype(str)
 equity_ratio_table = tabulate(merged_asst_lib_eq_net_rev_df_filtered[['year', 'equity_ratio', 'equity_growthrate']], headers='keys', tablefmt='pretty')
 print(equity_ratio_table)
+
+# combine ratio results
+merged_df = pd.merge(merged_cur_asst_lib_df_filtered[['year', 'current_ratio', 'currentratio_growthrate']], merged_asst_lib_eq_df_filtered[['year', 'debt_to_equity_ratio', 'DE_growthrate']], on='year', how='outer')
+merged_df = pd.merge(merged_df, merged_asst_lib_eq_net_df_filtered[['year', 'roe_ratio', 'roe_growthrate']], on='year', how='outer')
+merged_df = pd.merge(merged_df, merged_asst_lib_eq_net_rev_df[['year', 'netprofitmargin_ratio', 'netprofitmargin_growthrate']], on='year', how='outer')
+merged_df = pd.merge(merged_df, merged_asst_lib_eq_net_rev_df[['year', 'asset_turnover_ratio', 'assetsturnover_growthrate']], on='year', how='outer')
+merged_df = pd.merge(merged_df, merged_asst_lib_eq_net_rev_df_filtered[['year', 'equity_ratio', 'equity_growthrate']], on='year', how='outer')
+merged_df_table = tabulate(merged_df, headers='keys', tablefmt='pretty')
+print(merged_df_table)
 
 """
 Second company = Kroger Co. (KR)
@@ -1167,6 +1178,38 @@ current_ratio_plot2.update_layout(xaxis_title="Date")
 
 current_ratio_plot2.show()
 
+# create a combo chart to show Assets, Liabilities, and Current Ratio
+
+# Create a bar chart for assets and liabilities
+bar_chart = go.Figure()
+bar_chart.add_trace(go.Bar(x=merged_cur_asst_lib_df_filtered2['end'],
+                           y=merged_cur_asst_lib_df_filtered2['current_assets'],
+                           name='Assets'))
+bar_chart.add_trace(go.Bar(x=merged_cur_asst_lib_df_filtered2['end'],
+                           y=merged_cur_asst_lib_df_filtered2['current_liabilities'],
+                           name='Liabilities'))
+
+# Create a line chart for current ratio
+line_chart = go.Figure()
+line_chart.add_trace(go.Scatter(x=merged_cur_asst_lib_df_filtered2['end'],
+                                y=merged_cur_asst_lib_df_filtered2['current_ratio'],
+                                mode='lines',
+                                name='Current Ratio'))
+
+# combining bar and line charts
+combo_chart = go.Figure()
+
+for trace in bar_chart.data:
+    combo_chart.add_trace(trace)
+
+combo_chart.add_trace(line_chart.data[0])
+
+# Update layout
+combo_chart.update_layout(barmode='stack', title='Combo Graph: Assets, Liabilities, and Current Ratio')
+
+combo_chart.show()
+
+
 # check growth rate
 merged_cur_asst_lib_df_filtered2['currentratio_growthrate'] = ((merged_cur_asst_lib_df_filtered2['current_ratio'].shift(-1) - merged_cur_asst_lib_df_filtered2['current_ratio']) / merged_cur_asst_lib_df_filtered2['current_ratio']) * 100
 print(merged_cur_asst_lib_df_filtered2[['end', 'current_ratio', 'currentratio_growthrate']])
@@ -1322,12 +1365,13 @@ current_ratio_table2 = tabulate(merged_cur_asst_lib_df_filtered2[['year', 'curre
 print(current_ratio_table2)
 
 # D/E
-merged_asst_lib_eq_df_filtered2['year'] = merged_asst_lib_eq_df_filtered2['end'].dt.year.astype(str)
+merged_asst_lib_eq_df_filtered2.loc[merged_asst_lib_eq_df_filtered2['end'] > '2017-01-01', 'year'] = merged_asst_lib_eq_df_filtered2['end'].dt.year.astype(str)
 DE_ratio_table2 = tabulate(merged_asst_lib_eq_df_filtered2[['year', 'debt_to_equity_ratio', 'DE_growthrate']], headers='keys', tablefmt='pretty')
 print(DE_ratio_table2)
 
 # Return on Equity
-merged_asst_lib_eq_net_df_filtered2['year'] = merged_asst_lib_eq_net_df_filtered2['end'].dt.year.astype(str)
+# using loc to avoid warning
+merged_asst_lib_eq_net_df_filtered2.loc[merged_asst_lib_eq_net_df_filtered2['end'] > '2017-01-01', 'year'] = merged_asst_lib_eq_net_df_filtered2['end'].dt.year.astype(str)
 roe_ratio_table2 = tabulate(merged_asst_lib_eq_net_df_filtered2[['year', 'roe_ratio', 'roe_growthrate']], headers='keys', tablefmt='pretty')
 print(roe_ratio_table2)
 
@@ -1346,5 +1390,14 @@ print(assetsturnover_ratio_table)
 merged_asst_lib_eq_net_rev_df_filtered2['year'] = merged_asst_lib_eq_net_rev_df_filtered2['end'].dt.year.astype(str)
 equity_ratio_table2 = tabulate(merged_asst_lib_eq_net_rev_df_filtered2[['year', 'equity_ratio', 'equity_growthrate']], headers='keys', tablefmt='pretty')
 print(equity_ratio_table2)
+
+# combine ratio results
+merged_df2 = pd.merge(merged_cur_asst_lib_df_filtered2[['year', 'current_ratio', 'currentratio_growthrate']], merged_asst_lib_eq_df_filtered2[['year', 'debt_to_equity_ratio', 'DE_growthrate']], on='year', how='outer')
+merged_df2 = pd.merge(merged_df2, merged_asst_lib_eq_net_df_filtered2[['year', 'roe_ratio', 'roe_growthrate']], on='year', how='outer')
+merged_df2 = pd.merge(merged_df2, merged_asst_lib_eq_net_rev_df2[['year', 'netprofitmargin_ratio', 'netprofitmargin_growthrate']], on='year', how='outer')
+merged_df2 = pd.merge(merged_df2, merged_asst_lib_eq_net_rev_df2[['year', 'asset_turnover_ratio', 'assetsturnover_growthrate']], on='year', how='outer')
+merged_df2 = pd.merge(merged_df2, merged_asst_lib_eq_net_rev_df_filtered2[['year', 'equity_ratio', 'equity_growthrate']], on='year', how='outer')
+merged_df_table2 = tabulate(merged_df2, headers='keys', tablefmt='pretty')
+print(merged_df_table2)
 
 print('End of code. Thank you.')
