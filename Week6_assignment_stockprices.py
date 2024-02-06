@@ -22,11 +22,24 @@ pd.set_option('display.max_columns', 3000)
 
 pd.options.plotting.backend = 'plotly'
 
-# function to get cik_str for the selected company
 def search_comp(ticker):
+    '''this function will get cik_str for the selected company'''
     return(companyCIK.loc[companyCIK['ticker'] == ticker, 'cik_str'].iloc[0])
 
-# API call 
+
+def create_graph(title):
+    '''this function will create revenue graph'''
+    graph = revenues_df.plot(x='end', y='val',
+                             title= title,#f"AAPL revenues",
+                             labels = {
+                                 "val": "Value in $",
+                                 "end": "Quater End Date"
+                        })
+    graph.show()
+
+
+
+# API call to get all companies data
 
 # create a request header
 headers = {'User-Agent':"sberg@seattleu.edu"}
@@ -48,25 +61,16 @@ cik = search_comp(ticker_symbol)
 print(cik) #MSFT 0000789019 APPL 0000320193 COST 0000909832 KR 0000056873
 print(companyCIK[companyCIK['cik_str']==cik]) #0  0000789019   MSFT  MICROSOFT CORP
 
-# get index for 
-comp_index = companyCIK.loc[companyCIK['cik_str'] == cik].index[0] 
-print(comp_index)
-
 companyFacts = requests.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json", headers=headers)
 
-revenues_df = pd.DataFrame(companyFacts.json()['facts']['us-gaap']['Revenues']['units']['USD'])
+revenues_df = pd.DataFrame(companyFacts.json()['facts']['us-gaap']['RevenueFromContractWithCustomerExcludingAssessedTax']['units']['USD'])
 print(revenues_df)
 
-graph = revenues_df.plot(x='end', y='val',
-                        title=f"MSFT revenues",
-                        labels = {
-                            "val": "Value in $",
-                            "end": "Quater End Date"
-                        })
-graph.show()
+# call function create_graph to create Revenue graph
+create_graph('AAPL Revenue')
 
 # start date for the api call
-start_date_str = '2010-07-30' # first filted date
+start_date_str = '2019-10-31' # first filted date
 
 # convert str to datetime
 start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
@@ -82,7 +86,7 @@ print(end_date, end_date_str)
 ticker = yf.Ticker(ticker_symbol)
 
 # pull yfinance historical data
-historical_data = ticker.history(period='id', start=start_date_str)
+historical_data = ticker.history(period='1d', start=start_date_str, end=end_date_str)
 
 # create historical dataframe
 historical_df = pd.DataFrame(historical_data)
@@ -93,13 +97,14 @@ revenues_df['closing_stock_price'] = 0
 
 for index, row in revenues_df.iterrows():
     value = row['filed']
+    # print(value)
     
     # get tickers symbol
-    ticker_symbol = companyCIK['ticker'][0]
+    ticker_symbol = companyCIK['ticker'][1]
     # print(ticker_symbol)
 
     # start date for the api call
-    start_date_str = '2010-07-30' # first filted date
+    start_date_str = value # iterate the filed date
 
     # convert str to datetime
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
@@ -115,10 +120,11 @@ for index, row in revenues_df.iterrows():
     ticker = yf.Ticker(ticker_symbol)
 
     # pull yfinance historical data
-    historical_data = ticker.history(period='id', start=start_date_str)
+    historical_data = ticker.history(period='1d', start=start_date_str, end=end_date_str)
 
     # create historical dataframe
     historical_df = pd.DataFrame(historical_data)
+    # print(historical_df)
     
     # need the first row of the closing date
     specific_data = historical_data.iloc[0]['Close'] 
