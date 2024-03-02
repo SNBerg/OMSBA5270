@@ -12,19 +12,24 @@ Objectives:
 4. Event Study: Perform an event study around the dates of significant financial disclosures (e.g., annual reports, quarterly earnings) to observe stock price reactions before and after these events.
 """
 
-
 # import libraries
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from tabulate import tabulate # to create ratio tables
+import numpy as np 
+from scipy.stats import linregress
 import plotly.express as px
+import plotly
 import plotly.graph_objects as go # for combo chart
 
 # if using Spyder
 import plotly.io as pio
 pio.renderers.default='browser'
 #pio.renderers.default = "svg"
+
+import warnings
+warnings.filterwarnings('ignore')
 
 # setup display so it shows all columns
 pd.options.display.width= None
@@ -66,8 +71,8 @@ In 2023, it is the third-largest retailer in the world with annual net sales of 
 # get company cik_str
 ticker_symbol = 'COST'
 cik = companyCIK.loc[companyCIK['ticker'] == ticker_symbol, 'cik_str'].iloc[0]
-print(cik) # 0000789019
-# print(companyCIK[companyCIK['cik_str']==cik])
+# print(cik) # 0000909832
+print(companyCIK[companyCIK['cik_str']==cik])
 
 """ 
 Data retrieval and EDA 
@@ -81,7 +86,7 @@ companyFacts = requests.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik
 # print(companyFacts.json().keys())
 # print(companyFacts.json()['facts'])
 
-""" Functions to get data in each key """
+""" Functions to get data from each key """
 def getdata(key, form):
     df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap'][key]['units']['USD'])
     df = df.sort_values(by=['end', 'filed'])
@@ -106,17 +111,19 @@ Tax collected from customer is tax assessed by governmental authority that is bo
 including, but not limited to, sales, use, value added and excise.
 """
 revenue_df, revenue_df_filtered = getdata('Revenues', '10-K')
-# observation: no null data, 288 rows start date between 2008-08-31 - 2023-11-26 - need to align period with other data points
+# observations: no null data, 288 rows start date between 2008-08-31 - 2023-11-26 - need to align period with other data points
 # has start and end date, has quarterly and annual data presented
+# Note on data anormally: 10-K contains all annual data but not all quarterly data were reported. Quarterly filing missing after FY17.
 # has NaN in frame column - need to clean up
 # end date is object type
 
-# quarterly data missing Q4 of FY21-22-23
-# additional revenue data to get quarterly data for using in stock price analysis
+# additional revenue data to get quarterly data for using in stock price analysis from FY2017 and onward
 revenue2k_df, revenue2k_df_filtered = getdata('RevenueFromContractWithCustomerExcludingAssessedTax', '10-K')
+# print(revenue2k_df_filtered) # 2016-08-28 2023-11-26
+
 # additional data to get quarterly data from 8/31/2020
 revenue2q_df, revenue2q_df_filtered = getdata('RevenueFromContractWithCustomerExcludingAssessedTax', '10-Q')
-# print(revenue_df_filtered,revenue2_df_filtered)
+# print(revenue2q_df_filtered) # 2016-08-28 2023-11-26
 
 # get Assets and convert the facts on assets to a dataframe
 """
@@ -125,7 +132,16 @@ Sum of the carrying amounts as of the balance sheet date of all assets that are 
 Assets are probable future economic benefits obtained or controlled by an entity as a result of past transactions or events.
 """
 assets_df, assets_df_filtered = getdata('Assets', '10-K')
-# observation: no null data, 158 rows end date between 2008-08-31 - 2023-11-26 - need to align period with other data points
+# print(assets_df)
+
+# check 10-Q
+# assetsq_df, assetsq_df_filtered = getdata('Assets', '10-Q')
+# assetsq_df = assetsq_df.drop_duplicates('end')
+# assetsq_df = assetsq_df.reset_index(drop=True)
+# print(assetsq_df['filed'].unique())
+# print(assetsq_df_filtered)
+
+# observations: no null data, 158 rows end date between 2008-08-31 - 2023-11-26 - need to align period with other data points
 # fp values are all FY, has NaN in frame column, has duplicated end date - need to clean up
 # end date is object type
 
@@ -136,10 +152,9 @@ Sum of the carrying amounts as of the balance sheet date of all assets that are 
 Assets are probable future economic benefits obtained or controlled by an entity as a result of past transactions or events.
 """
 cur_assets_df, cur_assets_df_filtered = getdata('AssetsCurrent', '10-K')
-# observation: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
+# observations: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
 # fp values are all FY, has NaN in frame column, has duplicated end dates - need to dedup and clean up
 # end date is object type
-
 
 # get liabilities data and convert the facts on assets to a dataframe
 """
@@ -149,7 +164,7 @@ Liabilities are probable future sacrifices of economic benefits arising from pre
 or provide services to other entities in the future.
 """
 liabilities_df, liabilities_df_filtered = getdata('Liabilities', '10-K')
-# observation: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
+# observations: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
 # fp values are all FY, has NaN in frame column, has duplicated end dates - need to dedup and clean up
 # end date is object type
 
@@ -159,7 +174,7 @@ LiabilitiesCurrent
 Total obligations incurred as part of normal operations that are expected to be paid during the following twelve months or within one business cycle, if longer.
 """
 cur_liabilities_df, cur_libilities_df_filtered = getdata('LiabilitiesCurrent', '10-K') 
-# observation: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
+# observations: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
 # fp values are all FY, has NaN in frame column, has duplicated end dates - need to dedup and clean up
 # end date is object type
 
@@ -172,7 +187,7 @@ which is allocable to that ownership interest in subsidiary equity which is not 
 This excludes temporary equity and is sometimes called permanent equity.
 """
 equity_df, equity_df_filtered = getdata('StockholdersEquity', '10-K') 
-# observation: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
+# observations: no null data, 114 rows end date between 2009-08-30 - 2023-11-26 - need to align period with other data points
 # fp values are all FY, has NaN in frame column, has duplicated end dates - need to dedup and clean up
 # end date is object type
 
@@ -182,10 +197,19 @@ NetIncomeLossLoss
 The portion of profit or loss for the period, net of income taxes, which is attributable to the parent.
 """
 netincome_df, netincome_df_filtered = getdata('NetIncomeLoss', '10-K') 
-# observation: no null data, 272 rows end date between 2008-08-31 - 2023-11-26 - need to align period with other data points
+# observations: no null data, 272 rows end date between 2008-08-31 - 2023-11-26 - need to align period with other data points
 # has start and end date, has quarterly and annual data presented
 # fp values are all FY, has NaN in frame column, has duplicated end dates - need to dedup and clean up
 # end date is object type
+
+# print(companyFacts.json()['facts']['us-gaap']['CommonStockDividendsPerShareDeclared']['units'].keys())#dict_keys(['pure', 'USD/shares']
+# print(companyFacts.json()['facts']['us-gaap']['CommonStockDividendsPerShareDeclared']['units']['USD/shares'])
+
+dividend_df = pd.DataFrame.from_dict(companyFacts.json()['facts']['us-gaap']['CommonStockDividendsPerShareDeclared']['units']['USD/shares'])
+dividend_df_filtered = dividend_df[dividend_df['form']=='10-K']
+print(dividend_df_filtered)
+# observations: dividend reports up to 2020-11-22 both form 10-Q and 10-K. There is a mentioned in the 10-K report for 2023 but no filed data
+
 
 """
 Data cleaning and wrangling - cleanup duplicated row and prepare data for the next step
@@ -296,7 +320,7 @@ for i in range(start_index, len(revenue2q_df_sum), 3):
     rev_sum = rows_to_sum['val'].sum()
     end_date = rows_to_sum.iloc[0]['start']
     rev[end_date] = rev_sum 
-print(rev)
+# print(rev)
 
 # convert to Dataframe
 rev_df = pd.DataFrame.from_dict(rev, orient='index', columns=['val'])
@@ -314,7 +338,7 @@ revenue2k_df_annual = revenue2k_df_annual[revenue2k_df_annual['start'] >= '8/31/
 revenue2k_df_annual = revenue2k_df_annual.dropna()
 print(revenue2k_df_annual)
 
-# create a new column to 
+# create a new column to capture calculated quarterly revenue
 revenue2k_df_annual['val_q'] = revenue2k_df_annual['val'] - revenue2k_df_annual['start'].map(rev) 
 
 # add the missing quarterly start date to the dataframe
@@ -327,11 +351,11 @@ revenue2k_df_missing = revenue2k_df_missing[['start_q', 'end', 'val_q', 'accn', 
 revenue2k_df_missing = revenue2k_df_missing.rename(columns={'val_q': 'val', 'start_q': 'start'})
 print(revenue2k_df_missing)
 
-# add missing quarter
+# add missing quarters to the dataframe
 combined_revenues = pd.concat([combined_revenues, revenue2k_df_missing], ignore_index=True)
 combined_revenues = combined_revenues.sort_values(by=['end'])
 combined_revenues = combined_revenues.reset_index(drop=True)
-print(combined_revenues)
+print(combined_revenues) # 45 rows # end date from 2012-11-25 to 2023-11-26
 
 # print(assets_df_filtered) # 2009-08-31 to 2023-09-03
 assets_df_clean = cleanup(assets_df_filtered, 2013)
@@ -422,7 +446,7 @@ merged_df = merged_df.rename(columns={'form_x': 'form', 'filed_x': 'filed', 'fra
 
 # merge equity to the df
 merged_df = pd.merge(merged_df, equity_df_clean, on=['end'], how='inner')
-print(merged_df.columns)
+# print(merged_df.columns)
 
 # drop un-used columns
 merged_df = merged_df[['end', 'assets', 'liabilities', 'cur_assets', 'cur_liabilities', 'revenues', 'netincome', 'val', 'form_x', 'filed_x', 'frame_x']]
@@ -444,40 +468,209 @@ merged_df['debt_to_equity_ratio'] = merged_df['liabilities']/merged_df['equity']
 merged_df['netprofitmargin_ratio'] = (merged_df['netincome'] / merged_df['revenues']) * 100
 # print(merged_df)
 
+""" Get filing date """
+# print(revenue_df)
+allfilings = revenue_df[['accn','form','filed']]
+allfilings = allfilings[allfilings['form'] == '10-Q']
+allfilings = allfilings.drop_duplicates()
+
+# convert to datetime
+allfilings['filed'] = pd.to_datetime(allfilings['filed'])
+print(allfilings)
+
+# find the last date
+last_filing_date = allfilings.iloc[-1]['filed']
+print(last_filing_date)
+
+# find the last 2 years date
+three_year_filing_date = last_filing_date - pd.DateOffset(years = 10)
+print(three_year_filing_date)
+
+# filter for the last 3 years of filing date
+allfilings_filtered = allfilings[(allfilings['filed'] >= three_year_filing_date) & (allfilings['filed'] <= last_filing_date)]
+print(allfilings_filtered)
+
+# convert filing dates back to str
+allfilings_filtered['filed'] = allfilings_filtered['filed'].dt.strftime('%Y-%m-%d')
+
+# print(allfilings_filtered.info())
+
+######################################
+# pull the stock market price based upon the filing date
+
+import yfinance as yf
+from datetime import datetime, timedelta
+
+# create empty column to add stock price too
+allfilings_filtered['stock_price'] = 0
+
+for index, row in allfilings_filtered.iterrows():
+    value = row['filed']
+          
+    # start date for the api call
+    start_date_str = value # iterate the filed date
+
+    # convert str to datetime
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+    
+    # calculate the delta
+    end_date = start_date + timedelta(weeks=1) # get end date 1 week after the filed date
+
+    # convert end date back to str to feed to yfinance
+    end_date_str = end_date.strftime('%Y-%m-%d')
+    # print(start_date, end_date, end_date_str)
+
+    # create a y finance ticker object
+    ticker = yf.Ticker(ticker_symbol)
+
+    # pull yfinance historical data
+    historical_data = ticker.history(period='1d', start=start_date_str, end=end_date_str)
+
+    # create historical dataframe
+    historical_df = pd.DataFrame(historical_data)
+    # print(historical_df)
+    
+    # need the first row of the closing date
+    specific_data = historical_data.iloc[0]['Close'] 
+    
+    allfilings_filtered.at[index,'stock_price'] = specific_data
+    
+    print(specific_data)
+
+print(allfilings_filtered)
+
+
 """ Data visualization """
+# Function to create line graph
+def line_graph(df, title, x, y, x_label, y_label):
+    print('create line graph')
+    plot = px.line(df,
+                   x=x, y=y,
+                   title=title,
+                   labels={x: x_label,
+                           y: y_label})
+    
+    # add callout for each datapoint
+    # for i in range(len(df)):
+    #     plot.add_annotation(x=df[x][i], y=df[y][i],
+    #                         text=f"{df[y][i]:,.2f}",
+    #                         showarrow=True,
+    #                         arrowhead=1,
+    #                         ax=0,
+    #                         ay=-30)
+    # return plotly.offline.plot(plot)
+    return plot
+
+# Revenues
+rev_plot = line_graph(combined_revenues,'COST Revenues Between FY2013-2023','end', 'val', 'Date', 'Value in $')
+plotly.offline.plot(rev_plot)
+
+# create bar chart with trend line
+# Calculate trend line
+x = np.arange(len(combined_revenues['end']))
+slope, intercept, _, _, _ = linregress(x, combined_revenues['val'])
+trend_line = slope * x + intercept
+
+# Create bar plot
+rev_bar_trend_plot = px.bar(combined_revenues, 
+                      x='end', y='val',
+                      title='COST Revenues Between FY2013-2023',
+                      labels={'end': 'Date',
+                              'val': 'Value in $'})
+
+# add trend line
+rev_bar_trend_plot.add_scatter(x=combined_revenues['end'], 
+                         y=trend_line, 
+                         mode='lines',
+                         name='trend Line')
+
+plotly.offline.plot(rev_bar_trend_plot)
+
+# Total assets and Total liabilities 
+asst_li_plot = px.line(merged_df,
+                           x='end', y=['assets', 'liabilities'],
+                           title='COST Total Assets & Total Liabilities')
+
+# Update layout to set x-axis and y-axis title
+asst_li_plot.update_layout(yaxis_title="Value in $")
+asst_li_plot.update_layout(xaxis_title="Date")
+plotly.offline.plot(asst_li_plot)
+
+# Current assets and current liabilities
+cur_asst_li_plot = px.line(merged_df,
+                           x='end', y=['cur_assets', 'cur_liabilities'],
+                           title='COST Current Assets & Current Liabilities')
+
+# Update layout to set x-axis and y-axis title
+cur_asst_li_plot.update_layout(yaxis_title="Value in $")
+cur_asst_li_plot.update_layout(xaxis_title="Date")
+plotly.offline.plot(cur_asst_li_plot)
+
+# create equity chart
+equity_plot = line_graph(merged_df, 'COST Stockholder Equity Between FY2013-2023', 'end', 'equity', 'Date', 'Value in $')
+plotly.offline.plot(equity_plot)
+
+# create netincome chart
+netincome_plot = line_graph(merged_df, 'COST Netincome between FY2013-2023', 'end', 'netincome', 'Date', 'Value in $')
+plotly.offline.plot(netincome_plot)
+
+# function to create combo chart displaying data points and ratio
+def create_combo_chart(df, ybar1, name1, ybar2, name2, y2line, y2name, title):
+
+    # Create a bar chart for Current assets and Current liabilities
+    bar_chart = go.Figure()
+    bar_chart.add_trace(go.Bar(x=df['end'], y=df[ybar1], name=name1))
+    bar_chart.add_trace(go.Bar(x=df['end'], y=df[ybar2], name=name2))
+
+    # # Create a line chart for current ratio
+    line_chart = go.Figure()
+    line_chart.add_trace(go.Scatter(x=df['end'], y=df[y2line], mode='lines', name=y2name, yaxis='y2'))
+
+    # # Create a combo graph by combining bar and line charts
+    combo_chart = go.Figure()
+
+    # # Add bar chart traces to combo chart
+    for trace in bar_chart.data:
+        combo_chart.add_trace(trace)
+
+    # # Add line chart trace to combo chart
+    for trace in line_chart.data:
+        combo_chart.add_trace(trace)
+
+    # # Update layout for better visualization
+    combo_chart.update_layout(
+        barmode='group',
+        title=title,
+        yaxis=dict(title='Value in $'),
+        yaxis2=dict(title='Ratio', overlaying='y', side='right')
+    )
+
+    # # Show the graph
+    return plotly.offline.plot(combo_chart)
+
+# create a combo chart to show Current Assets, Current Liabilities, and Current Ratio
+current_ratio_plot = create_combo_chart(merged_df, 
+                                        'cur_assets', 'Current Assets', 
+                                        'cur_liabilities', 'Current Liabilities', 
+                                        'current_ratio', 'Current Ratio', 
+                                        'Combo Graph: Current Assets, Current Liabilities, and Current Ratio')
+
+# Create a bar chart for merged_df['debt_to_equity_ratio'] = merged_df['liabilities']/merged_df['equity']
+de_ratio_plot = create_combo_chart(merged_df,
+                                   'liabilities', 'Total Liabilities', 
+                                   'equity', 'Stockholder Equity', 
+                                   'debt_to_equity_ratio', 'D/E Ratio', 
+                                   'Combo Graph: Total Liabilities, Stockholder Equity, and Debt to Equity (D/E) Ratio')
 
 
+# graph filings date vs stock price
+pd.options.plotting.backend = 'plotly'
+graph = allfilings_filtered.plot(x='filed', y='stock_price',
+                            title=f'MSFT Stock Price vs Filing Date for {ticker_symbol}',
+                            labels={'stock_price': 'Stock Price', 'filingDate': 'Filing Date'},
+                            )
+plotly.offline.plot(graph)
 
-# create a combo chart to show Assets, Liabilities, and Current Ratio
-
-# Create a bar chart for assets and liabilities
-# bar_chart = go.Figure()
-# bar_chart.add_trace(go.Bar(x=merged_cur_asst_lib_df_filtered['end'], y=merged_cur_asst_lib_df_filtered['current_assets'], name='Current Assets'))
-# bar_chart.add_trace(go.Bar(x=merged_cur_asst_lib_df_filtered['end'], y=merged_cur_asst_lib_df_filtered['current_liabilities'], name='Current Liabilities'))
-
-# # Create a line chart for current ratio
-# line_chart = go.Figure()
-# line_chart.add_trace(go.Scatter(x=merged_cur_asst_lib_df_filtered['end'], y=merged_cur_asst_lib_df_filtered['current_ratio'], mode='lines', name='Current Ratio', yaxis='y2'))
-
-# # Create a combo graph by combining bar and line charts
-# combo_chart = go.Figure()
-
-# # Add bar chart traces to combo chart
-# for trace in bar_chart.data:
-#     combo_chart.add_trace(trace)
-
-# # Add line chart trace to combo chart
-# for trace in line_chart.data:
-#     combo_chart.add_trace(trace)
-
-# # Update layout for better visualization
-# combo_chart.update_layout(
-#     barmode='group',
-#     title='Combo Graph: Current Assets, Current Liabilities, and Current Ratio',
-#     yaxis=dict(title='Current Assets and Current Liabilities'),
-#     yaxis2=dict(title='Current Ratio', overlaying='y', side='right')
-# )
-
-# # Show the graph
-# combo_chart.show()
-
+# create net profit margin ratio chart
+netincome_plot = line_graph(merged_df, 'COST Net Profit Margin Ratio between FY2013-2023', 'end', 'netprofitmargin_ratio', 'Date', 'Value (%)')
+plotly.offline.plot(netincome_plot)
