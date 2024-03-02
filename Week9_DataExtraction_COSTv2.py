@@ -18,6 +18,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from tabulate import tabulate # to create ratio tables
 import numpy as np 
+from numpy import median
 from scipy.stats import linregress
 import plotly.express as px
 import plotly
@@ -99,8 +100,8 @@ def getdata(key, form):
 
     # exploring data
     print(df.info())
-    print(df.count(), min(df['end']), max(df['end']))
-
+    print(median(df['val']), min(df['end']), max(df['end']))
+    print(df.describe())
     return(df, df_filtered)
 
 # get revenues data
@@ -210,7 +211,6 @@ dividend_df_filtered = dividend_df[dividend_df['form']=='10-K']
 print(dividend_df_filtered)
 # observations: dividend reports up to 2020-11-22 both form 10-Q and 10-K. There is a mentioned in the 10-K report for 2023 but no filed data
 
-
 """
 Data cleaning and wrangling - cleanup duplicated row and prepare data for the next step
 """
@@ -230,6 +230,7 @@ def cleanup(df, year):
     df = df[df['end_date'].dt.year >= year]
     df = df.drop(columns=['end_date'])
     df = df.reset_index(drop=True)
+ 
     return df
 
 # make a copy of the filter dataframe to create a clean dataframe
@@ -463,14 +464,38 @@ merged_df['current_ratio'] = merged_df['cur_assets']/ merged_df['cur_liabilities
 # this ratio help us understand the net worth of the company by comparing the total shareholders' equity to its total liabilities
 merged_df['debt_to_equity_ratio'] = merged_df['liabilities']/merged_df['equity']
 
-# 3. Net Profit Margin = Net Income/Total Revenue
+# 3. Return on Equity = Net Income / Shareholder Equity (ref, https://www.investopedia.com/ask/answers/070914/how-do-you-calculate-return-equity-roe.asp)
+# this ratio provides insight into the efficiently of company on managing shareholders' equity. it indicates how much money shareholders make on their investment.
+merged_df['roe_ratio'] = merged_df['netincome'] / merged_df['equity']
+# print(merged_asst_lib_eq_net_df)
+
+# 4. Net Profit Margin = Net Income/Total Revenue
 # this ratio measure as a percentage, of how much netincome is generated from every dollar of revenue.
 merged_df['netprofitmargin_ratio'] = (merged_df['netincome'] / merged_df['revenues']) * 100
 # print(merged_df)
 
+""" growth rate """
+def growth_rate(col_name, df, val):
+    """ Function to calculate and return growth rate"""
+    df[col_name] = ((df[val].shift(-1) - df[val]) / df[val]) * 100
+    return df
+
+# Revenue (quarterly)
+# print(combined_revenues)    
+combined_revenues = growth_rate('rev_quarterly_growthrate', combined_revenues, 'val') 
+
+# annual growth rate for each data point and financial ratio
+merged_df = growth_rate('revenue_growthrate', merged_df, 'revenues')
+merged_df = growth_rate('netincome_growthrate', merged_df, 'netincome')
+merged_df = growth_rate('current_ratio_growthrate', merged_df, 'current_ratio')
+merged_df = growth_rate('de_growthrate', merged_df, 'debt_to_equity_ratio')
+merged_df = growth_rate('netprofitmargin_growthrate', merged_df, 'netprofitmargin_ratio')
+merged_df = growth_rate('roe_growthrate', merged_df, 'roe_ratio')
+print(merged_df)
+
 """ Get filing date """
-# print(revenue_df)
-allfilings = revenue_df[['accn','form','filed']]
+print(combined_revenues)
+allfilings = revenue_df[['start', 'end','val', 'accn', 'fp','form','filed']]
 allfilings = allfilings[allfilings['form'] == '10-Q']
 allfilings = allfilings.drop_duplicates()
 
@@ -541,29 +566,85 @@ print(allfilings_filtered)
 
 
 """ Data visualization """
-# Function to create line graph
-def line_graph(df, title, x, y, x_label, y_label):
-    print('create line graph')
-    plot = px.line(df,
-                   x=x, y=y,
-                   title=title,
-                   labels={x: x_label,
-                           y: y_label})
+pd.options.plotting.backend = 'plotly'
+def line_graph(df, title, x, y, x_label, y_label, showlabel=0):
+    """ This function creates a line graph. """
+    # print('create line graph') 
+    # print(df)
+    # print(title, x, y, x_label, y_label, callout)
     
-    # add callout for each datapoint
-    # for i in range(len(df)):
-    #     plot.add_annotation(x=df[x][i], y=df[y][i],
-    #                         text=f"{df[y][i]:,.2f}",
-    #                         showarrow=True,
-    #                         arrowhead=1,
-    #                         ax=0,
-    #                         ay=-30)
-    # return plotly.offline.plot(plot)
+    # check if need to add data label on the graph
+    if showlabel == 1:
+        plot = px.line(df,
+                x=x, y=y, text=y,
+                title=title,
+                labels={x: x_label,
+                        y: y_label})
+        plot.update_traces(texttemplate='%{y}')
+        plot.update_layout(yaxis_tickformat='.2f')
+        
+        # shift data labels to above the line
+        plot.update_traces(textposition='top center')
+    else:
+        plot = px.line(df,
+                    x=x, y=y,
+                    title=title,
+                    labels={x: x_label,
+                            y: y_label})
+
+    # check if need to add callouts to line graph.
+    # if callout == 1:
+    #     for i in range(len(df)):
+    #         idx = df[y].sub(i).abs().idxmin()  # Find index of nearest value in the DataFrame
+    #         plot.add_annotation(x=df[x][i], y=df[y][i],
+    #                             text=f"{df[y][idx]:,.2f}",
+    #                             # text=f"{df[y][i]:,.2f}",
+    #                             showarrow=True,
+    #                             arrowhead=1,
+    #                             ax=0,
+    #                             ay=-30)
     return plot
 
 # Revenues
-rev_plot = line_graph(combined_revenues,'COST Revenues Between FY2013-2023','end', 'val', 'Date', 'Value in $')
+rev_plot = line_graph(combined_revenues,'COST Revenues Between FY2013-2023','end', 'val', 'Date', 'Value in $', 0) # too crowded, need to adjust data label format if want to show data label.
 plotly.offline.plot(rev_plot)
+
+# Filings date vs stock price
+stock_plot = line_graph(allfilings_filtered,'MSFT Stock Price vs Filing Date for Costco (COST)', 'filed', 'stock_price', 'Filing Date', 'Stock Price ($)',1)
+plotly.offline.plot(stock_plot)
+
+# create equity chart
+equity_plot = line_graph(merged_df, 'COST Stockholder Equity Between FY2013-2023', 'end', 'equity', 'Date', 'Value in $')
+plotly.offline.plot(equity_plot)
+
+# Profit margin ratio chart
+netincome_plot = line_graph(merged_df, 'COST Net Profit Margin Ratio between FY2013-2023', 'end', 'netprofitmargin_ratio', 'Date', 'Value (%)')
+plotly.offline.plot(netincome_plot)
+
+# Return on Equity
+roe_plot = line_graph(merged_df, 'Costco (COST) Return on Equity Between FY2013-2023', 'end', 'roe_ratio', 'Date', 'Value in $')
+plotly.offline.plot(roe_plot)
+
+# Assets and liabilities line chart
+asst_li_plot = px.line(merged_df,
+                           x='end', y=['assets', 'liabilities'],
+                           title='COST Total Assets & Total Liabilities')
+
+# Update layout to set x-axis and y-axis title
+asst_li_plot.update_layout(yaxis_title="Value in $")
+asst_li_plot.update_layout(xaxis_title="Date")
+plotly.offline.plot(asst_li_plot)
+
+# Current assets and current liabilities line chart
+cur_asst_li_plot = px.line(merged_df,
+                           x='end', y=['cur_assets', 'cur_liabilities'],
+                           title='COST Current Assets & Current Liabilities')
+
+# Update layout to set x-axis and y-axis title
+cur_asst_li_plot.update_layout(yaxis_title="Value in $")
+cur_asst_li_plot.update_layout(xaxis_title="Date")
+plotly.offline.plot(cur_asst_li_plot)
+
 
 # create bar chart with trend line
 # Calculate trend line
@@ -585,34 +666,6 @@ rev_bar_trend_plot.add_scatter(x=combined_revenues['end'],
                          name='trend Line')
 
 plotly.offline.plot(rev_bar_trend_plot)
-
-# Total assets and Total liabilities 
-asst_li_plot = px.line(merged_df,
-                           x='end', y=['assets', 'liabilities'],
-                           title='COST Total Assets & Total Liabilities')
-
-# Update layout to set x-axis and y-axis title
-asst_li_plot.update_layout(yaxis_title="Value in $")
-asst_li_plot.update_layout(xaxis_title="Date")
-plotly.offline.plot(asst_li_plot)
-
-# Current assets and current liabilities
-cur_asst_li_plot = px.line(merged_df,
-                           x='end', y=['cur_assets', 'cur_liabilities'],
-                           title='COST Current Assets & Current Liabilities')
-
-# Update layout to set x-axis and y-axis title
-cur_asst_li_plot.update_layout(yaxis_title="Value in $")
-cur_asst_li_plot.update_layout(xaxis_title="Date")
-plotly.offline.plot(cur_asst_li_plot)
-
-# create equity chart
-equity_plot = line_graph(merged_df, 'COST Stockholder Equity Between FY2013-2023', 'end', 'equity', 'Date', 'Value in $')
-plotly.offline.plot(equity_plot)
-
-# create netincome chart
-netincome_plot = line_graph(merged_df, 'COST Netincome between FY2013-2023', 'end', 'netincome', 'Date', 'Value in $')
-plotly.offline.plot(netincome_plot)
 
 # function to create combo chart displaying data points and ratio
 def create_combo_chart(df, ybar1, name1, ybar2, name2, y2line, y2name, title):
@@ -662,15 +715,5 @@ de_ratio_plot = create_combo_chart(merged_df,
                                    'debt_to_equity_ratio', 'D/E Ratio', 
                                    'Combo Graph: Total Liabilities, Stockholder Equity, and Debt to Equity (D/E) Ratio')
 
+print(allfilings_filtered)
 
-# graph filings date vs stock price
-pd.options.plotting.backend = 'plotly'
-graph = allfilings_filtered.plot(x='filed', y='stock_price',
-                            title=f'MSFT Stock Price vs Filing Date for {ticker_symbol}',
-                            labels={'stock_price': 'Stock Price', 'filingDate': 'Filing Date'},
-                            )
-plotly.offline.plot(graph)
-
-# create net profit margin ratio chart
-netincome_plot = line_graph(merged_df, 'COST Net Profit Margin Ratio between FY2013-2023', 'end', 'netprofitmargin_ratio', 'Date', 'Value (%)')
-plotly.offline.plot(netincome_plot)
