@@ -23,6 +23,7 @@ from scipy.stats import linregress
 import plotly.express as px
 import plotly
 import plotly.graph_objects as go # for combo chart
+import plotly.graph_objects as go # for stock before and after charts
 
 # if using Spyder
 import plotly.io as pio
@@ -494,8 +495,8 @@ merged_df = growth_rate('roe_growthrate', merged_df, 'roe_ratio')
 print(merged_df)
 
 """ Get filing date """
-print(combined_revenues)
-allfilings = revenue_df[['start', 'end','val', 'accn', 'fp','form','filed']]
+# get unique filing date
+allfilings = revenue_df[['accn', 'fp','form','filed']]
 allfilings = allfilings[allfilings['form'] == '10-Q']
 allfilings = allfilings.drop_duplicates()
 
@@ -508,7 +509,7 @@ last_filing_date = allfilings.iloc[-1]['filed']
 print(last_filing_date)
 
 # find the last 2 years date
-three_year_filing_date = last_filing_date - pd.DateOffset(years = 10)
+three_year_filing_date = last_filing_date - pd.DateOffset(years = 5)
 print(three_year_filing_date)
 
 # filter for the last 3 years of filing date
@@ -526,47 +527,109 @@ allfilings_filtered['filed'] = allfilings_filtered['filed'].dt.strftime('%Y-%m-%
 import yfinance as yf
 from datetime import datetime, timedelta
 
-# create empty column to add stock price too
-allfilings_filtered['stock_price'] = 0
+# create empty column to add stock price to the quarterly filing 
+# print(allfilings_filtered)
+allfilings_filtered['stock_price_before'] = 0
+allfilings_filtered['stock_price_after'] = 0
 
 for index, row in allfilings_filtered.iterrows():
     value = row['filed']
+    # print(value)
           
     # start date for the api call
-    start_date_str = value # iterate the filed date
-
-    # convert str to datetime
-    start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-    
+    start_date_before = datetime.strptime(value, '%Y-%m-%d') # convert filing date str to datetime
+    start_date_before = start_date_before - timedelta(weeks=1) # get stock prices 1 week date before the filing date
+    start_date_str_before = start_date_before.strftime('%Y-%m-%d') # convert datetime back to str
+ 
     # calculate the delta
-    end_date = start_date + timedelta(weeks=1) # get end date 1 week after the filed date
+    end_date_str_before = value # end date for one week before is the date of filing
+    # print(start_date_before, end_date_str_after)
 
-    # convert end date back to str to feed to yfinance
-    end_date_str = end_date.strftime('%Y-%m-%d')
-    # print(start_date, end_date, end_date_str)
+    # get start and end date after the filing date
+    start_date_str_after = value # start date is from the date of filing
+    start_date_after = datetime.strptime(start_date_str_after, '%Y-%m-%d') # convert to datetime
+    
+    end_date_after = start_date_after + timedelta(weeks=1) # get end date 1 day after the filed date
+    end_date_str_after = end_date_after.strftime('%Y-%m-%d') # convert end date back to str to feed to yfinance
+    # print(start_date_after, end_date_after)
 
     # create a y finance ticker object
     ticker = yf.Ticker(ticker_symbol)
 
     # pull yfinance historical data
-    historical_data = ticker.history(period='1d', start=start_date_str, end=end_date_str)
+    historical_data_before = ticker.history(period='1d', start=start_date_str_before, end=end_date_str_before)
+    historical_data_after = ticker.history(period='1d', start=start_date_str_after, end=end_date_str_after)
 
     # create historical dataframe
-    historical_df = pd.DataFrame(historical_data)
-    # print(historical_df)
+    historical_df_before = pd.DataFrame(historical_data_before)   
+    historical_df_after = pd.DataFrame(historical_data_after)
+    # print(historical_df_before, historical_df_after)
     
     # need the first row of the closing date
-    specific_data = historical_data.iloc[0]['Close'] 
+    specific_data_before = historical_data_before.iloc[0]['Close'] 
+    specific_data_after = historical_data_after.iloc[0]['Close'] 
+    print(specific_data_before, specific_data_after)
     
-    allfilings_filtered.at[index,'stock_price'] = specific_data
-    
-    print(specific_data)
+    # store the specific date data in the dataframe
+    allfilings_filtered.at[index,'stock_price_before'] = specific_data_before
+    allfilings_filtered.at[index,'stock_price_after'] = specific_data_after   
 
 print(allfilings_filtered)
 
+# add stock prices to the annual filing
+
+# create empty column to add stock price to the quarterly filing 
+# print(merged_df)
+merged_df['stock_price_before'] = 0
+merged_df['stock_price_after'] = 0
+
+for index, row in merged_df.iterrows():
+    value = row['filed']
+    # print(value)
+          
+    # start date for the api call
+    start_date_before = datetime.strptime(value, '%Y-%m-%d') # convert filing date str to datetime
+    start_date_before = start_date_before - timedelta(weeks=1) # get stock prices 1 week date before the filing date
+    start_date_str_before = start_date_before.strftime('%Y-%m-%d') # convert datetime back to str
+ 
+    # calculate the delta
+    end_date_str_before = value # end date for one week before is the date of filing
+    # print(start_date_before, end_date_str_after)
+
+    # get start and end date after the filing date
+    start_date_str_after = value # start date is from the date of filing
+    start_date_after = datetime.strptime(start_date_str_after, '%Y-%m-%d') # convert to datetime
+    
+    end_date_after = start_date_after + timedelta(weeks=1) # get end date 1 day after the filed date
+    end_date_str_after = end_date_after.strftime('%Y-%m-%d') # convert end date back to str to feed to yfinance
+    # print(start_date_after, end_date_after)
+
+    # create a y finance ticker object
+    ticker = yf.Ticker(ticker_symbol)
+
+    # pull yfinance historical data
+    historical_data_before = ticker.history(period='1d', start=start_date_str_before, end=end_date_str_before)
+    historical_data_after = ticker.history(period='1d', start=start_date_str_after, end=end_date_str_after)
+
+    # create historical dataframe
+    historical_df_before = pd.DataFrame(historical_data_before)   
+    historical_df_after = pd.DataFrame(historical_data_after)
+    # print(historical_df_before, historical_df_after)
+    
+    # need the first row of the closing date
+    specific_data_before = historical_data_before.iloc[0]['Close'] 
+    specific_data_after = historical_data_after.iloc[0]['Close'] 
+    print(specific_data_before, specific_data_after)
+    
+    # store the specific date data in the dataframe
+    merged_df.at[index,'stock_price_before'] = specific_data_before
+    merged_df.at[index,'stock_price_after'] = specific_data_after   
+
+print(merged_df)
 
 """ Data visualization """
 pd.options.plotting.backend = 'plotly'
+
 def line_graph(df, title, x, y, x_label, y_label, showlabel=0):
     """ This function creates a line graph. """
     # print('create line graph') 
@@ -609,21 +672,25 @@ def line_graph(df, title, x, y, x_label, y_label, showlabel=0):
 rev_plot = line_graph(combined_revenues,'COST Revenues Between FY2013-2023','end', 'val', 'Date', 'Value in $', 0) # too crowded, need to adjust data label format if want to show data label.
 plotly.offline.plot(rev_plot)
 
-# Filings date vs stock price
-stock_plot = line_graph(allfilings_filtered,'MSFT Stock Price vs Filing Date for Costco (COST)', 'filed', 'stock_price', 'Filing Date', 'Stock Price ($)',1)
-plotly.offline.plot(stock_plot)
+# Net Income
+netincome_plot = line_graph(merged_df, 'COST Net Income Between FY2013-2023', 'end', 'netincome', 'Date', 'Value in $')
+plotly.offline.plot(netincome_plot)
 
 # create equity chart
 equity_plot = line_graph(merged_df, 'COST Stockholder Equity Between FY2013-2023', 'end', 'equity', 'Date', 'Value in $')
 plotly.offline.plot(equity_plot)
 
 # Profit margin ratio chart
-netincome_plot = line_graph(merged_df, 'COST Net Profit Margin Ratio between FY2013-2023', 'end', 'netprofitmargin_ratio', 'Date', 'Value (%)')
-plotly.offline.plot(netincome_plot)
+netprofitmargin_plot = line_graph(merged_df, 'COST Net Profit Margin Ratio between FY2013-2023', 'end', 'netprofitmargin_ratio', 'Date', 'Value (%)')
+plotly.offline.plot(netprofitmargin_plot)
 
 # Return on Equity
 roe_plot = line_graph(merged_df, 'Costco (COST) Return on Equity Between FY2013-2023', 'end', 'roe_ratio', 'Date', 'Value in $')
 plotly.offline.plot(roe_plot)
+
+# # Filings date vs stock price
+# stock_plot = line_graph(allfilings_filtered,'MSFT Stock Price vs Filing Date for Costco (COST)', 'filed', 'stock_price', 'Filing Date', 'Stock Price ($)',1)
+# plotly.offline.plot(stock_plot)
 
 # Assets and liabilities line chart
 asst_li_plot = px.line(merged_df,
@@ -645,6 +712,61 @@ cur_asst_li_plot.update_layout(yaxis_title="Value in $")
 cur_asst_li_plot.update_layout(xaxis_title="Date")
 plotly.offline.plot(cur_asst_li_plot)
 
+# Create the quarterly stock movement chart showing prices before and after
+q_stock_fig = go.Figure()
+
+# Add the before and after stock prices as lines
+q_stock_fig.add_trace(go.Scatter(x=allfilings_filtered['filed'], 
+                         y=allfilings_filtered['stock_price_before'],
+                           mode='lines+markers+text', 
+                           name='Stock Price Before', 
+                           text=allfilings_filtered['stock_price_before'], 
+                           texttemplate='%{text:.2f}',
+                           textposition='top left'))
+q_stock_fig.add_trace(go.Scatter(x=allfilings_filtered['filed'], 
+                         y=allfilings_filtered['stock_price_after'], 
+                         mode='lines+markers+text', 
+                         name='Stock Price After', 
+                         text=allfilings_filtered['stock_price_after'], 
+                         texttemplate='%{text:.2f}',
+                         textposition='bottom right'))
+
+# Update layout
+q_stock_fig.update_layout(
+    title=f'Stock Price Before and After Filing Date for {ticker_symbol}, Filing Date Between Dec 2018-2023',
+    xaxis_title='Filing Date',
+    yaxis_title='Stock Price',
+    legend=dict(x=0.02, y=0.98, xanchor='left', yanchor='top')
+)
+plotly.offline.plot(q_stock_fig)
+
+# create annual filing date vs stock prices before and after chart
+annual_stock_fig = go.Figure()
+
+# Add the before and after stock prices as lines
+annual_stock_fig.add_trace(go.Scatter(x=merged_df['filed'], 
+                         y=merged_df['stock_price_before'],
+                           mode='lines+markers+text', 
+                           name='Stock Price Before', 
+                           text=merged_df['stock_price_before'], 
+                           texttemplate='%{text:.2f}',
+                           textposition='top left'))
+annual_stock_fig.add_trace(go.Scatter(x=merged_df['filed'], 
+                         y=merged_df['stock_price_after'], 
+                         mode='lines+markers+text', 
+                         name='Stock Price After', 
+                         text=merged_df['stock_price_after'], 
+                         texttemplate='%{text:.2f}',
+                         textposition='bottom right'))
+
+# Update layout
+annual_stock_fig.update_layout(
+    title=f'Stock Price Before and After Annual Filing Date for {ticker_symbol}, Filing Date Between Oct 2015-2023',
+    xaxis_title='Filing Date',
+    yaxis_title='Stock Price',
+    legend=dict(x=0.02, y=0.98, xanchor='left', yanchor='top')
+)
+plotly.offline.plot(annual_stock_fig)
 
 # create bar chart with trend line
 # Calculate trend line
@@ -697,7 +819,6 @@ def create_combo_chart(df, ybar1, name1, ybar2, name2, y2line, y2name, title):
         yaxis=dict(title='Value in $'),
         yaxis2=dict(title='Ratio', overlaying='y', side='right')
     )
-
     # # Show the graph
     return plotly.offline.plot(combo_chart)
 
@@ -708,12 +829,19 @@ current_ratio_plot = create_combo_chart(merged_df,
                                         'current_ratio', 'Current Ratio', 
                                         'Combo Graph: Current Assets, Current Liabilities, and Current Ratio')
 
-# Create a bar chart for merged_df['debt_to_equity_ratio'] = merged_df['liabilities']/merged_df['equity']
+# Create a combo chart for D/E ratio
 de_ratio_plot = create_combo_chart(merged_df,
                                    'liabilities', 'Total Liabilities', 
                                    'equity', 'Stockholder Equity', 
                                    'debt_to_equity_ratio', 'D/E Ratio', 
                                    'Combo Graph: Total Liabilities, Stockholder Equity, and Debt to Equity (D/E) Ratio')
 
-print(allfilings_filtered)
+# create combo chart for ROE ratio
+roe_combo_plot = create_combo_chart(merged_df, 
+                                    'netincome', 'Net Income',
+                                    'equity', 'Stockholder Equity',
+                                    'roe_ratio', 'ROE Ratio',
+                                    'Combo Graph: Net Income, Shareholder Equity, and Return on Equity')
+
+print('End of Code. Thank you!')
 
