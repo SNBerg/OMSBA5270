@@ -936,7 +936,7 @@ heatmap_df = merged_df[['revenues', 'netincome', 'equity','current_ratio', 'debt
 corr = heatmap_df.corr()
 
 plt.figure(figsize=(8,6))
-sns.heatmap(corr, annot=True, cmap='inferno')
+sns.heatmap(corr, annot=True, cmap='cividis')
 plt.title('Correlation Heatmap')
 plt.show()
 
