@@ -491,11 +491,15 @@ combined_revenues = growth_rate('rev_quarterly_growthrate', combined_revenues, '
 # annual growth rate for each data point and financial ratio
 merged_df = growth_rate('revenue_growthrate', merged_df, 'revenues')
 merged_df = growth_rate('netincome_growthrate', merged_df, 'netincome')
+merged_df = growth_rate('equity_growthrate', merged_df, 'equity')
 merged_df = growth_rate('current_ratio_growthrate', merged_df, 'current_ratio')
 merged_df = growth_rate('de_growthrate', merged_df, 'debt_to_equity_ratio')
 merged_df = growth_rate('netprofitmargin_growthrate', merged_df, 'netprofitmargin_ratio')
 merged_df = growth_rate('roe_growthrate', merged_df, 'roe_ratio')
 print(merged_df)
+merged_df = merged_df.sort_values(by='end', ascending=False)
+excel_file_path=r'C:\Users\w_sir\OneDrive - Seattle University\5270\pythonProject\ratio2.xlsx'  
+merged_df.to_excel(excel_file_path,index=False, engine='openpyxl') 
 
 """ Get filing date """
 # 1. examine the relationship between stock prices and the filing dates
@@ -526,6 +530,7 @@ allfilings_filtered['filed'] = allfilings_filtered['filed'].dt.strftime('%Y-%m-%
 # print(allfilings_filtered.info())
 
 ######################################
+# Stock integration with yfinance
 # pull the stock market price based upon the filing date
 
 import yfinance as yf
