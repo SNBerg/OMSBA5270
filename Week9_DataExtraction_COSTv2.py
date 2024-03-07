@@ -880,7 +880,7 @@ def create_combo_chart(df, ybar1, name1, ybar2, name2, y2line, y2name, title):
         yaxis2=dict(title='Ratio', overlaying='y', side='right')
     )
     # # Show the graph
-    return plotly.offline.plot(combo_chart)
+    return combo_chart #plotly.offline.plot(combo_chart)
 
 # create a combo chart to show Current Assets, Current Liabilities, and Current Ratio
 current_ratio_plot = create_combo_chart(merged_df, 
@@ -888,6 +888,7 @@ current_ratio_plot = create_combo_chart(merged_df,
                                         'cur_liabilities', 'Current Liabilities', 
                                         'current_ratio', 'Current Ratio', 
                                         'Combo Graph: Current Assets, Current Liabilities, and Current Ratio')
+plotly.offline.plot(current_ratio_plot)
 
 # Create a combo chart for D/E ratio
 de_ratio_plot = create_combo_chart(merged_df,
@@ -895,6 +896,7 @@ de_ratio_plot = create_combo_chart(merged_df,
                                    'equity', 'Stockholder Equity', 
                                    'debt_to_equity_ratio', 'D/E Ratio', 
                                    'Combo Graph: Total Liabilities, Stockholder Equity, and Debt to Equity (D/E) Ratio')
+plotly.offline.plot(de_ratio_plot)
 
 # Profit margin ratio chart
 netprofitmargin_plot = line_graph(merged_df, 'COST Net Profit Margin Ratio between FY2013-2023', 'end', 'netprofitmargin_ratio', 'Date', 'Value (%)')
@@ -910,6 +912,7 @@ roe_combo_plot = create_combo_chart(merged_df,
                                     'equity', 'Stockholder Equity',
                                     'roe_ratio', 'ROE Ratio',
                                     'Combo Graph: Net Income, Shareholder Equity, and Return on Equity')
+plotly.offline.plot(roe_combo_plot)
 
 # Filings date vs stock price
 # print(allfilings_filtered)
@@ -937,12 +940,22 @@ fig.update_layout(
 plotly.offline.plot(fig)
 
 # correlation
-heatmap_df = merged_df[['revenues', 'netincome', 'equity','current_ratio', 'debt_to_equity_ratio', 'roe_ratio', 'netprofitmargin_ratio','stock_price_after']]
+merged_df_filtered = merged_df.copy()
+merged_df_filtered['end'] = pd.to_datetime(merged_df_filtered['end'], format='%Y-%m-%d') 
+# filter for the last 5 years
+merged_df_filtered = merged_df_filtered[merged_df_filtered['end'] > '2018-09-02']
+print(merged_df_filtered)
+
+heatmap_df = merged_df[['revenues', 'netincome', 'equity','current_ratio', 'debt_to_equity_ratio', 'roe_ratio', 'netprofitmargin_ratio','stock_price']]
 corr = heatmap_df.corr()
+
+heatmap_df = merged_df_filtered[['revenues', 'netincome', 'equity','current_ratio', 'debt_to_equity_ratio', 'roe_ratio', 'netprofitmargin_ratio','stock_price']]
+corr_5yrs = heatmap_df.corr()
 
 plt.figure(figsize=(8,6))
 sns.heatmap(corr, annot=True, cmap='cividis')
-plt.title('Correlation Heatmap')
+sns.heatmap(corr_5yrs, annot=True, cmap='cividis')
+plt.title('Correlation Heatmap between 2019-2023')
 plt.show()
 
 print('End of Code. Thank you!')
